@@ -31,18 +31,27 @@ from PIL import Image
 # -- Phase 1: Minimal imports for the splash screen -----------------------
 # Only the panel factory + PIL + qrcode are needed here.  Imported before the
 # background threads start to avoid GIL contention with heavy imports.
-from display.panel_factory import get_panel
+from display.panel_factory import get_panel, is_rich_mode, rich_fullscreen
 from setup.configuration import CONFIG_PATH, Config
 from setup.logging import setup_logging
 from utilities.cli import dispatch_cli_command
 from version import VERSION
 
-panel = get_panel()
-# Font loading doesn't require the matrix to be initialised
-loading_font = panel.load_font(
-    os.path.join(os.path.dirname(__file__), "fonts", "4x6.bdf")
-)
-test_font = panel.load_font(os.path.join(os.path.dirname(__file__), "fonts", "4x6.bdf"))
+# Rich HDMI mode has its own boot path (no RGB panel, no BDF splash fonts);
+# skip the module-scope panel/font setup and branch inside run_flight_tracker.
+if is_rich_mode():
+    panel = None
+    loading_font = None
+    test_font = None
+else:
+    panel = get_panel()
+    # Font loading doesn't require the matrix to be initialised
+    loading_font = panel.load_font(
+        os.path.join(os.path.dirname(__file__), "fonts", "4x6.bdf")
+    )
+    test_font = panel.load_font(
+        os.path.join(os.path.dirname(__file__), "fonts", "4x6.bdf")
+    )
 
 try:
     import qrcode
@@ -417,6 +426,34 @@ def _warn_if_root() -> None:
         )
 
 
+def _start_flask_background(cfg: Config) -> None:
+    """Kick Flask off on a daemon thread without blocking on readiness.
+
+    Used by the rich HDMI boot path where we don't need to synchronise a
+    splash-screen countdown against Flask's port binding.
+    """
+    ready = threading.Event()
+    result: dict = {}
+    threading.Thread(
+        target=flask_load,
+        args=(ready, result),
+        daemon=True,
+        name="flask-load-rich",
+    ).start()
+    # Poke the app_ready event once Flask has bound its port so anything
+    # gating on it (background scene threads, etc.) unblocks.
+    def _mark_ready() -> None:
+        ready.wait()
+        try:
+            from web.app import app_ready
+
+            app_ready.set()
+        except Exception:
+            pass
+
+    threading.Thread(target=_mark_ready, daemon=True, name="flask-ready-mark").start()
+
+
 def run_flight_tracker(disable_tests: bool = False):
     setup_logging()
     logger = logging.getLogger("startup")
@@ -425,6 +462,16 @@ def run_flight_tracker(disable_tests: bool = False):
 
     cfg = Config.instance()
     logger.info("FlightTracker starting (log level: %s)", cfg.log_level)
+
+    if is_rich_mode():
+        # Rich HDMI: skip RGB panel init, splash, and connectivity tests.
+        # Flask still runs for web-config access.
+        if cfg.web_interface_enabled:
+            _start_flask_background(cfg)
+        from hdmi_rich import run_rich
+
+        run_rich(cfg, fullscreen=rich_fullscreen())
+        return
 
     # Initialise matrix once with full config values
     panel.init_matrix(
