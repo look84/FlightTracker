@@ -25,8 +25,17 @@ from math import cos, radians, sin
 import pygame
 
 from hdmi_rich import theme
+from hdmi_rich.chrome import SceneChrome
 from hdmi_rich.scenes.scene_base import RichScene
 from hdmi_rich.widgets import azel, block, header, ticker
+
+
+# Fixed layout rects - used by both the static chrome pass and the
+# per-frame dynamic draws.
+_PLOT_RECT = pygame.Rect(24, 120, 900, 840)
+_WIN_RECT = pygame.Rect(948, 120, 940, 260)
+_TEL_RECT = pygame.Rect(948, 400, 940, 300)
+_UP_RECT = pygame.Rect(948, 720, 940, 240)
 
 CYCLE_SECONDS = 4.0          # dwell on each active sat when there are several
 REFRESH_MAX_AGE = 3600.0     # recompute passes every hour
@@ -47,6 +56,7 @@ class RichSatelliteScene(RichScene):
 
         self._cycle_index = 0
         self._cycle_last = 0.0
+        self._chrome = SceneChrome()
 
     # ---- scene manager contract ---------------------------------------
 
@@ -125,8 +135,20 @@ class RichSatelliteScene(RichScene):
 
     # ---- draw ---------------------------------------------------------
 
+    def _render_static(self, bg) -> None:
+        # Az-El plot chrome + grid, then the three right-column blocks.
+        block.chrome(bg, self.fonts, _PLOT_RECT, "AZ / EL")
+        inner = block.inner(_PLOT_RECT)
+        radius = min(inner.width, inner.height) // 2 - 40
+        azel.draw_grid(bg, self.fonts, inner.centerx, inner.centery, radius)
+
+        block.chrome(bg, self.fonts, _WIN_RECT, "PASS WINDOW")
+        block.chrome(bg, self.fonts, _TEL_RECT, "TELEMETRY")
+        block.chrome(bg, self.fonts, _UP_RECT, "UPCOMING PASSES")
+
     def draw(self, screen, t: float) -> None:
         surface = screen.surface
+        surface.blit(self._chrome.get(surface, self._render_static), (0, 0))
 
         active = self._active_passes()
         window = None
@@ -141,12 +163,9 @@ class RichSatelliteScene(RichScene):
             (window.name if window else None),
         )
 
-        # -- Az-El plot ---------------------------------------------------
-        plot_rect = pygame.Rect(24, 120, 900, 840)
-        inner = block.draw(surface, self.fonts, plot_rect, "AZ / EL")
+        # -- Az-El animation (trajectory + current pos + beam) -----------
+        inner = block.inner(_PLOT_RECT)
         radius = min(inner.width, inner.height) // 2 - 40
-        cx = inner.centerx
-        cy = inner.centery
         current = None
         traj = []
         if window is not None:
@@ -154,20 +173,15 @@ class RichSatelliteScene(RichScene):
 
             current = current_position(window)
             traj = window.trajectory
-        azel.draw(surface, self.fonts, cx, cy, radius, traj, current, t)
+        azel.draw_animation(
+            surface, self.fonts, inner.centerx, inner.centery, radius,
+            traj, current, t,
+        )
 
-        # -- Right column -------------------------------------------------
-        # Top: pass window info
-        win_rect = pygame.Rect(948, 120, 940, 260)
-        self._draw_window_info(surface, win_rect, window)
-
-        # Middle: live telemetry
-        tel_rect = pygame.Rect(948, 400, 940, 300)
-        self._draw_telemetry(surface, tel_rect, window)
-
-        # Bottom: upcoming passes
-        up_rect = pygame.Rect(948, 720, 940, 240)
-        self._draw_upcoming(surface, up_rect)
+        # -- Right column dynamic content -------------------------------
+        self._draw_window_info(surface, _WIN_RECT, window)
+        self._draw_telemetry(surface, _TEL_RECT, window)
+        self._draw_upcoming(surface, _UP_RECT)
 
         # Ticker
         n = len(active)
@@ -175,7 +189,7 @@ class RichSatelliteScene(RichScene):
         ticker.draw(surface, self.fonts, 1080 - ticker.HEIGHT, line)
 
     def _draw_window_info(self, surface, rect, window):
-        inner = block.draw(surface, self.fonts, rect, "PASS WINDOW")
+        inner = block.inner(rect)
         if window is None:
             self._dash(surface, inner, "NO ACTIVE PASS")
             return
@@ -198,7 +212,7 @@ class RichSatelliteScene(RichScene):
             surface.blit(v, (inner.right - v.get_width(), y))
 
     def _draw_telemetry(self, surface, rect, window):
-        inner = block.draw(surface, self.fonts, rect, "TELEMETRY")
+        inner = block.inner(rect)
         if window is None:
             self._dash(surface, inner, "NO TELEMETRY")
             return
@@ -234,7 +248,7 @@ class RichSatelliteScene(RichScene):
             )
 
     def _draw_upcoming(self, surface, rect):
-        inner = block.draw(surface, self.fonts, rect, "UPCOMING PASSES")
+        inner = block.inner(rect)
         upcoming = self._upcoming_passes(limit=4)
         if not upcoming:
             self._dash(surface, inner, "NO UPCOMING PASSES")

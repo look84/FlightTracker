@@ -19,6 +19,7 @@ from datetime import datetime, timedelta
 import pygame
 
 from hdmi_rich import theme
+from hdmi_rich.chrome import SceneChrome
 from hdmi_rich.scenes.scene_base import RichScene
 from hdmi_rich.widgets import block, header, ticker
 
@@ -30,6 +31,7 @@ class RichIdleScene(RichScene):
         self.cfg = cfg
         self.fonts = fonts
         self._weather_service = None
+        self._chrome = SceneChrome()
 
     def has_data(self) -> bool:
         # Fallback scene - manager picks us when no other scene has data.
@@ -48,13 +50,8 @@ class RichIdleScene(RichScene):
         except Exception:
             return None
 
-    def draw(self, screen, t: float) -> None:
-        surface = screen.surface
-        header.draw(surface, self.fonts, "STANDBY", None)
-
-        weather = self._weather()
-
-        # Quadrant grid geometry
+    def _quadrants(self):
+        """Return the four (name, rect) quadrants; layout is fixed."""
         top = header.HEIGHT + 24
         bot = 1080 - ticker.HEIGHT - 24
         gap = 16
@@ -63,16 +60,29 @@ class RichIdleScene(RichScene):
         h_avail = bot - top - gap
         qw = w_avail // 2
         qh = h_avail // 2
+        return [
+            ("LOCAL TIME", pygame.Rect(pad, top, qw, qh)),
+            ("CONDITIONS", pygame.Rect(pad + qw + gap, top, qw, qh)),
+            ("FORECAST", pygame.Rect(pad, top + qh + gap, qw, qh)),
+            ("ASTRO", pygame.Rect(pad + qw + gap, top + qh + gap, qw, qh)),
+        ]
 
-        tl = pygame.Rect(pad, top, qw, qh)
-        tr = pygame.Rect(pad + qw + gap, top, qw, qh)
-        bl = pygame.Rect(pad, top + qh + gap, qw, qh)
-        br = pygame.Rect(pad + qw + gap, top + qh + gap, qw, qh)
+    def _render_static(self, bg) -> None:
+        # The four block outlines + chip labels never change; render once.
+        for label, rect in self._quadrants():
+            block.chrome(bg, self.fonts, rect, label)
 
-        self._draw_clock(surface, tl)
-        self._draw_conditions(surface, tr, weather)
-        self._draw_forecast(surface, bl, weather)
-        self._draw_astro(surface, br, weather)
+    def draw(self, screen, t: float) -> None:
+        surface = screen.surface
+        surface.blit(self._chrome.get(surface, self._render_static), (0, 0))
+        header.draw(surface, self.fonts, "STANDBY", None)
+
+        weather = self._weather()
+        quads = self._quadrants()
+        self._draw_clock(surface, quads[0][1])
+        self._draw_conditions(surface, quads[1][1], weather)
+        self._draw_forecast(surface, quads[2][1], weather)
+        self._draw_astro(surface, quads[3][1], weather)
 
         ticker.draw(
             surface,
@@ -84,7 +94,7 @@ class RichIdleScene(RichScene):
     # ---- quadrants ----
 
     def _draw_clock(self, surface, rect):
-        inner = block.draw(surface, self.fonts, rect, "LOCAL TIME")
+        inner = block.inner(rect)
         now = datetime.now()
         time_str = now.strftime("%H:%M:%S")
         date_str = now.strftime("%A").upper()
@@ -108,7 +118,7 @@ class RichIdleScene(RichScene):
         )
 
     def _draw_conditions(self, surface, rect, weather):
-        inner = block.draw(surface, self.fonts, rect, "CONDITIONS")
+        inner = block.inner(rect)
         if not weather:
             self._draw_dash(surface, inner, "WEATHER UNAVAILABLE")
             return
@@ -146,7 +156,7 @@ class RichIdleScene(RichScene):
             )
 
     def _draw_forecast(self, surface, rect, weather):
-        inner = block.draw(surface, self.fonts, rect, "FORECAST")
+        inner = block.inner(rect)
         daily = (weather or {}).get("daily") or []
         if not daily:
             self._draw_dash(surface, inner, "NO FORECAST DATA")
@@ -188,7 +198,7 @@ class RichIdleScene(RichScene):
                 )
 
     def _draw_astro(self, surface, rect, weather):
-        inner = block.draw(surface, self.fonts, rect, "ASTRO")
+        inner = block.inner(rect)
 
         sunrise = sunset = None
         moon = illum = None

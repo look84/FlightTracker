@@ -23,6 +23,7 @@ import time
 import pygame
 
 from hdmi_rich import theme
+from hdmi_rich.chrome import SceneChrome
 from hdmi_rich.scenes.scene_base import RichScene
 from hdmi_rich.widgets import block, field, header, radar, ticker
 
@@ -47,6 +48,7 @@ class RichFlightScene(RichScene):
         self._cycle_index = 0
         self._cycle_last = 0.0
         self._last_flight_id = None
+        self._chrome = SceneChrome()
 
     def has_data(self) -> bool:
         return bool(getattr(self.overhead, "data", None))
@@ -56,6 +58,12 @@ class RichFlightScene(RichScene):
         self._cycle_last = time.monotonic()
 
     def draw(self, screen, t: float) -> None:
+        # One-blit background with all the static chrome (radar rings +
+        # contacts block outline + column headers + aircraft separator).
+        screen.surface.blit(
+            self._chrome.get(screen.surface, self._render_static), (0, 0)
+        )
+
         flights = self.overhead.data
         primary_index = self._pick_primary_index(flights, t)
         primary = flights[primary_index] if flights else None
@@ -68,8 +76,8 @@ class RichFlightScene(RichScene):
             self._draw_aircraft(screen.surface, primary)
             self._draw_telemetry(screen.surface, primary)
 
-        self._draw_radar(screen.surface, flights, t)
-        self._draw_contacts(screen.surface, flights, primary_index)
+        self._draw_radar_dynamic(screen.surface, flights, t)
+        self._draw_contacts_dynamic(screen.surface, flights, primary_index)
 
         n_contacts = len(flights)
         source = self._data_source_label()
@@ -78,6 +86,33 @@ class RichFlightScene(RichScene):
             f"|  source: {source}  |  press Q/ESC to quit"
         )
         ticker.draw(screen.surface, self.fonts, 1080 - ticker.HEIGHT, message)
+
+    # -- static chrome (rendered once, cached) --------------------------
+
+    def _render_static(self, bg) -> None:
+        # Radar rings + ticks + labels
+        cx, cy, outer_r = self._radar_geometry()
+        radar.draw_grid(
+            bg,
+            self.fonts,
+            cx,
+            cy,
+            outer_r,
+            f"{int(self.cfg.flight_radius)} KM",
+        )
+
+        # Contacts block chrome + column headers
+        contacts_rect = self._contacts_rect()
+        inner = block.chrome(bg, self.fonts, contacts_rect, "CONTACTS")
+        for label, x in self._contacts_column_positions(inner):
+            hdr = self.fonts.tiny.render(label, True, theme.FAINT)
+            bg.blit(hdr, (x, inner.y))
+
+        # Aircraft separator line
+        sep_y = CONTENT_TOP + 260
+        pygame.draw.line(
+            bg, theme.DIM, (CARD_LEFT, sep_y), (CARD_RIGHT, sep_y), 1
+        )
 
     # -- cycling --------------------------------------------------------
 
@@ -143,18 +178,15 @@ class RichFlightScene(RichScene):
         return ""
 
     def _draw_aircraft(self, surface, flight) -> None:
+        # Separator line above the title is part of static chrome now.
         y = CONTENT_TOP + 260
-        rect = pygame.Rect(CARD_LEFT, y, CARD_RIGHT - CARD_LEFT, 110)
-        pygame.draw.line(
-            surface, theme.DIM, (rect.left, rect.top), (rect.right, rect.top), 1
-        )
         plane = flight.plane or "UNKNOWN TYPE"
         reg = flight.registration or ""
         title = plane.upper()
         if reg:
             title = f"{title}   |   REG {reg.upper()}"
         title_surf = self.fonts.large.render(title, True, theme.ACCENT)
-        surface.blit(title_surf, (rect.left, rect.top + 16))
+        surface.blit(title_surf, (CARD_LEFT, y + 16))
 
     def _draw_telemetry(self, surface, flight) -> None:
         y = CONTENT_TOP + 400
@@ -180,40 +212,49 @@ class RichFlightScene(RichScene):
                 )
                 field.draw(surface, self.fonts, rect, label, value, unit)
 
-    # -- radar ----------------------------------------------------------
+    # -- radar (dynamic) ------------------------------------------------
 
-    def _draw_radar(self, surface, flights, t: float) -> None:
+    def _radar_geometry(self) -> tuple[int, int, int]:
         radar_w = RADAR_RIGHT - RADAR_LEFT
         radar_h = RADAR_BOT - CONTENT_TOP
         cx = RADAR_LEFT + radar_w // 2
         cy = CONTENT_TOP + radar_h // 2
         outer_r = min(radar_w, radar_h) // 2 - 40
+        return cx, cy, outer_r
 
+    def _draw_radar_dynamic(self, surface, flights, t: float) -> None:
+        cx, cy, outer_r = self._radar_geometry()
         contacts = []
         n = max(1, len(flights))
         for i, f in enumerate(flights):
             bearing = float(int(f.heading or 0) % 360)
             range_norm = 0.15 + (i / max(1, n)) * 0.75
             contacts.append((bearing, range_norm, f.callsign))
-
-        radar.draw(
-            surface,
-            self.fonts,
-            cx,
-            cy,
-            outer_r,
-            contacts,
-            t,
-            outer_range_label=f"{int(self.cfg.flight_radius)} KM",
+        radar.draw_animation(
+            surface, self.fonts, cx, cy, outer_r, contacts, t
         )
 
-    # -- contacts panel -------------------------------------------------
+    # -- contacts panel (dynamic) ---------------------------------------
 
-    def _draw_contacts(self, surface, flights, current_index: int) -> None:
-        rect = pygame.Rect(
-            RADAR_LEFT, CONTACTS_TOP, RADAR_RIGHT - RADAR_LEFT, CONTENT_BOT - CONTACTS_TOP
+    def _contacts_rect(self) -> pygame.Rect:
+        return pygame.Rect(
+            RADAR_LEFT,
+            CONTACTS_TOP,
+            RADAR_RIGHT - RADAR_LEFT,
+            CONTENT_BOT - CONTACTS_TOP,
         )
-        inner = block.draw(surface, self.fonts, rect, "CONTACTS")
+
+    def _contacts_column_positions(self, inner):
+        return [
+            ("CALLSIGN", inner.x + 40),
+            ("HDG", inner.x + 340),
+            ("ALT", inner.x + 480),
+            ("SPD", inner.right - 140),
+        ]
+
+    def _draw_contacts_dynamic(self, surface, flights, current_index: int) -> None:
+        rect = self._contacts_rect()
+        inner = block.inner(rect)
 
         if not flights:
             msg = self.fonts.small.render("NO CONTACTS", True, theme.FAINT)
@@ -226,23 +267,14 @@ class RichFlightScene(RichScene):
             )
             return
 
+        col_positions = self._contacts_column_positions(inner)
         col_x = {
             "chev": inner.x,
-            "callsign": inner.x + 40,
-            "hdg": inner.x + 340,
-            "alt": inner.x + 480,
-            "spd": inner.right - 140,
+            "callsign": col_positions[0][1],
+            "hdg": col_positions[1][1],
+            "alt": col_positions[2][1],
+            "spd": col_positions[3][1],
         }
-        # Header row
-        headers = [
-            ("CALLSIGN", col_x["callsign"]),
-            ("HDG", col_x["hdg"]),
-            ("ALT", col_x["alt"]),
-            ("SPD", col_x["spd"]),
-        ]
-        for label, x in headers:
-            h = self.fonts.tiny.render(label, True, theme.FAINT)
-            surface.blit(h, (x, inner.y))
 
         row_h = 62
         max_rows = max(1, (inner.height - 48) // row_h)

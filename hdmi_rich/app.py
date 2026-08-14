@@ -69,7 +69,8 @@ class RichDisplay:
             while True:
                 t = time.monotonic() - start
                 screen.pump_events()
-                screen.clear(theme.BACKGROUND)
+                # Scenes now blit their own cached chrome as the background;
+                # no need to pre-fill the virtual surface here.
                 scene = manager.pick()
                 scene.draw(screen, t)
                 screen.present()
