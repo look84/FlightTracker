@@ -183,13 +183,24 @@ class RichDisplay:
     def _start_weather_service(self):
         """Kick the shared WeatherService singleton so its background fetch
         starts before the render loop, not on first idle-scene draw."""
+        import sys
+        import traceback
+
         try:
             from scenes.idle.themes.theme_utilities import WeatherService
 
             WeatherService.instance()
-            self.logger.info("WeatherService started at boot")
-        except Exception:
-            self.logger.exception("WeatherService boot start failed")
+            print("[rich-boot] WeatherService started OK", file=sys.stderr, flush=True)
+        except Exception as exc:
+            # Print the traceback to stderr - the MemoryLogHandler used by
+            # setup_logging() discards exc_info so logger.exception() would
+            # hide the underlying cause.
+            print(
+                f"[rich-boot] WeatherService boot start FAILED: {exc!r}",
+                file=sys.stderr,
+                flush=True,
+            )
+            traceback.print_exc()
 
     def _start_tle_manager(self):
         """Instantiate and start the shared TLEManager so pass computation

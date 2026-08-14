@@ -54,12 +54,20 @@ class MemoryLogHandler(logging.Handler):
     def emit(self, record: logging.LogRecord) -> None:
         # logging swallows exceptions raised in emit() after calling
         # handleError(), so we keep this minimal and defensive.
+        message = record.getMessage()
+        if record.exc_info:
+            # logger.exception() attaches exc_info; format + append it so the
+            # /logs viewer sees the traceback, not just the summary line.
+            try:
+                message = f"{message}\n{logging.Formatter().formatException(record.exc_info)}"
+            except Exception:
+                pass
         self._records.append(
             {
                 "time": record.created,
                 "level": record.levelname,
                 "source": record.name,
-                "message": record.getMessage(),
+                "message": message,
             }
         )
 
