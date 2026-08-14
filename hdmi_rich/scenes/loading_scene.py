@@ -47,9 +47,10 @@ class RichLoadingScene:
             (self._source_label(), state.get("data_source", "...")),
             ("TLE", state.get("tle", "...")),
             ("ROUTE", state.get("route", "...")),
+            ("WEATHER", state.get("weather", "...")),
             ("IP", state.get("ip", "...")),
         ]
-        row_h = s(80)
+        row_h = s(70)
         for i, (label, value) in enumerate(rows):
             y = inner.y + s(20) + i * row_h
             l_surf = self.fonts.medium.render(label, True, theme.ACCENT)

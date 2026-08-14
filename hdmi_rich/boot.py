@@ -59,6 +59,26 @@ def check_routing_reachable(cfg) -> bool:
     return route_providers.check_routing()
 
 
+def check_weather(cfg) -> bool:
+    """Verify the WeatherAPI endpoint is reachable with the configured key.
+
+    Returns True on HTTP 200, False on any other status or on network / URL
+    error.  When no key is configured the caller should short-circuit to
+    the "OFF" state without calling this.
+    """
+    import requests
+
+    try:
+        resp = requests.get(
+            "http://api.weatherapi.com/v1/current.json",
+            params={"key": cfg.weatherapi_key, "q": f"{cfg.observer_lat},{cfg.observer_lng}"},
+            timeout=5,
+        )
+        return resp.status_code == 200
+    except Exception:
+        return False
+
+
 def run_checks(cfg, state: dict) -> None:
     """Populate *state* with the results of each connectivity check.
 
@@ -85,6 +105,15 @@ def run_checks(cfg, state: dict) -> None:
             state["route"] = "OK" if check_routing_reachable(cfg) else "FAIL"
         except Exception:
             state["route"] = "FAIL"
+
+    if not getattr(cfg, "weatherapi_key", ""):
+        state["weather"] = "OFF"
+    else:
+        state["message"] = "CHECKING WEATHER SOURCE..."
+        try:
+            state["weather"] = "OK" if check_weather(cfg) else "FAIL"
+        except Exception:
+            state["weather"] = "FAIL"
 
     state["message"] = "READY"
     state["checks_done"] = True
