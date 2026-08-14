@@ -25,8 +25,10 @@ class RichLoadingScene:
         surface = screen.surface
         header.draw(surface, self.fonts, "FLIGHTTRACKER", None)
 
-        # Boot banner
-        title_font = self.fonts.xxlarge
+        # Boot banner - xlarge is big enough to read from across the room
+        # without overwhelming the two status blocks below (xxlarge here
+        # was overlapping the subtitle at 540p physical).
+        title_font = self.fonts.xlarge
         title_surf = title_font.render("FLIGHT TRACKER", True, theme.PRIMARY)
         surface.blit(
             title_surf,
@@ -66,7 +68,14 @@ class RichLoadingScene:
 
         url = state.get("url")
         if url:
-            qr_surf = qr.surface(url, module_pixels=max(2, s(8)))
+            # Aim for a QR that fills most of the block height (~inner.height
+            # minus room for the URL caption).  Cap per-module pixel size so
+            # the widget still has known bounds; the qr helper caches by
+            # (url, module_pixels).
+            avail_h = inner.height - s(60)
+            # QR usually ends up ~29 modules; pick module_pixels so it fits.
+            module_pixels = max(2, min(s(20), avail_h // 30))
+            qr_surf = qr.surface(url, module_pixels=module_pixels)
             qs = qr_surf.get_width()
             surface.blit(qr_surf, (inner.x + (inner.width - qs) // 2, inner.y + s(10)))
             url_surf = self.fonts.small.render(url, True, theme.PRIMARY)
