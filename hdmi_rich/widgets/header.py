@@ -19,12 +19,11 @@ _PAD_X = s(24)
 def draw(surface, fonts, title: str, callsign: str | None = None) -> None:
     """Draw the top banner.
 
-    * Outline + title colour switch from amber (STANDBY / idle) to
-      phosphor green (an active scene) when *callsign* is present.
-    * In active mode the title text flashes at 1 Hz (on 700 ms, off
-      300 ms) to draw the eye - the outline itself stays lit.
-    * The callsign, when set, is rendered centred across the banner
-      in the large font (bigger than the title).
+    * When *callsign* is None (idle / STANDBY) the *title* text is
+      shown left-padded in amber and the outline is amber.
+    * When *callsign* is set (active scene) the title is suppressed
+      entirely; the outline is phosphor green and the callsign is
+      rendered centred and flashing at 1 Hz (on 700 ms, off 300 ms).
     """
     import time
 
@@ -34,22 +33,20 @@ def draw(surface, fonts, title: str, callsign: str | None = None) -> None:
 
     pygame.draw.rect(surface, chrome_colour, pygame.Rect(0, 0, w, HEIGHT), 2)
 
-    # Title flashes only in active mode; STANDBY stays solid.
-    title_visible = True
     if is_active:
-        title_visible = (time.monotonic() % 1.0) < 0.7
-    if title_visible:
+        # Callsign only, centred, flashing.
+        if (time.monotonic() % 1.0) < 0.7:
+            cs_surf = fonts.large.render(callsign.upper(), True, theme.PRIMARY)
+            surface.blit(
+                cs_surf,
+                (
+                    (w - cs_surf.get_width()) // 2,
+                    HEIGHT // 2 - cs_surf.get_height() // 2,
+                ),
+            )
+    else:
+        # Idle title only, left-padded, solid.
         title_surf = fonts.medium.render(title.upper(), True, chrome_colour)
         surface.blit(
             title_surf, (_PAD_X, HEIGHT // 2 - title_surf.get_height() // 2)
-        )
-
-    if callsign:
-        cs_surf = fonts.large.render(callsign.upper(), True, theme.PRIMARY)
-        surface.blit(
-            cs_surf,
-            (
-                (w - cs_surf.get_width()) // 2,
-                HEIGHT // 2 - cs_surf.get_height() // 2,
-            ),
         )
