@@ -157,12 +157,12 @@ class HDMIPanel(RGBPanel):
         mode = "fullscreen" if self._fullscreen else "windowed"
         print(
             "\n"
-            "┌--------------------------------------------------┐\n"
-            f"│  HDMI panel - {mode:<35}│\n"
-            "│                                                  │\n"
-            "│  P       - save a photo to captures/             │\n"
-            "│  Q / ESC - quit                                  │\n"
-            "└--------------------------------------------------┘\n",
+            "+--------------------------------------------------+\n"
+            f"|  HDMI panel - {mode:<35}|\n"
+            "|                                                  |\n"
+            "|  P       - save a photo to captures/             |\n"
+            "|  Q / ESC - quit                                  |\n"
+            "+--------------------------------------------------+\n",
             flush=True,
         )
 
@@ -238,4 +238,4 @@ class HDMIPanel(RGBPanel):
         os.makedirs(_CAPTURE_DIR, exist_ok=True)
         path = os.path.join(_CAPTURE_DIR, f"{self._timestamp()}.png")
         pygame.image.save(self._screen, path)
-        print(f"📷  Photo saved: {path}", flush=True)
+        print(f"[photo] Saved: {path}", flush=True)
