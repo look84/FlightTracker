@@ -329,14 +329,19 @@ class RichFlightScene(RichScene):
         return left, right
 
     def _contacts_column_layout(self, col_rect):
-        """Header/data column positions within a single contacts column."""
+        """Header/data column positions within a single contacts column.
+
+        Anchors are packed left-of-centre with just enough space for each
+        value so the rightmost column (DIST) still fits inside col_rect
+        rather than spilling into the divider / adjacent column.
+        """
         w = col_rect.width
         return [
-            ("CALLSIGN", col_rect.x + s(40)),
-            ("HDG", col_rect.x + int(w * 0.36)),
-            ("ALT", col_rect.x + int(w * 0.52)),
-            ("SPD", col_rect.x + int(w * 0.72)),
-            ("DIST", col_rect.right - s(60)),
+            ("CALLSIGN", col_rect.x + s(20)),
+            ("HDG", col_rect.x + int(w * 0.28)),
+            ("ALT", col_rect.x + int(w * 0.46)),
+            ("SPD", col_rect.x + int(w * 0.66)),
+            ("DIST", col_rect.x + int(w * 0.84)),
         ]
 
     def _draw_contacts_dynamic(self, surface, flights, current_index: int) -> None:
