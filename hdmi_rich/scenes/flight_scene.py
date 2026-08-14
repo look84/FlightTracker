@@ -81,24 +81,25 @@ class RichFlightScene(RichScene):
 
     # -- cycling --------------------------------------------------------
 
-    def _pick_primary_index(self, flights, t: float) -> int:
+    def _pick_primary_index(self, flights, _t: float) -> int:
         """Advance the featured-flight cycle when multiple contacts are in range.
 
-        Resets to the closest (index 0) whenever the list shrinks below the
-        current index so we never point at a stale flight.
+        Uses ``time.monotonic()`` directly rather than the animation clock
+        so the cycle timing is unaffected by scene transitions.
         """
         n = len(flights)
+        now = time.monotonic()
         if n == 0:
             self._cycle_index = 0
             return 0
         if n == 1:
             self._cycle_index = 0
-            self._cycle_last = t
+            self._cycle_last = now
             self._last_flight_id = flights[0].flight_id
             return 0
-        if t - self._cycle_last >= CYCLE_SECONDS:
+        if now - self._cycle_last >= CYCLE_SECONDS:
             self._cycle_index = (self._cycle_index + 1) % n
-            self._cycle_last = t
+            self._cycle_last = now
         else:
             self._cycle_index %= n
         self._last_flight_id = flights[self._cycle_index].flight_id
