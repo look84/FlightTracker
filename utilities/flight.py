@@ -88,6 +88,10 @@ class Flight:
     heading: int = 0
     vertical_speed: int = 0
 
+    # Live position - None if the data source didn't report it.
+    lat: float | None = None
+    lng: float | None = None
+
     # -- Identity -----------------------------------------------------------
 
     @property

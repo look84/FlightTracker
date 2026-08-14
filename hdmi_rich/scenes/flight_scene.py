@@ -24,6 +24,7 @@ import pygame
 
 from hdmi_rich import theme
 from hdmi_rich.chrome import SceneChrome
+from hdmi_rich.geo import bearing_and_distance, eta_closest_approach_seconds
 from hdmi_rich.scenes.scene_base import RichScene
 from hdmi_rich.screen import VIRTUAL_H, VIRTUAL_W, s
 from hdmi_rich.widgets import block, field, header, radar, ticker
@@ -206,6 +207,9 @@ class RichFlightScene(RichScene):
         row_h = s(120)
         col_w = (CARD_RIGHT - CARD_LEFT) // 3
 
+        dist_km = self._distance_km(flight)
+        eta_s = self._eta_seconds(flight, dist_km)
+
         rows = [
             [
                 ("ALT", self._fmt_altitude(flight.altitude), "FT"),
@@ -214,8 +218,8 @@ class RichFlightScene(RichScene):
             ],
             [
                 ("VS", self._fmt_vertical_speed(flight.vertical_speed), "FPM"),
-                ("ETA", "--:--", "UTC"),
-                ("DIST", "--", "KM"),
+                ("ETA", self._fmt_eta(eta_s), "MIN"),
+                ("DIST", self._fmt_distance(dist_km), "KM"),
             ],
         ]
         for r, cols in enumerate(rows):
@@ -237,11 +241,19 @@ class RichFlightScene(RichScene):
 
     def _draw_radar_dynamic(self, surface, flights, t: float) -> None:
         cx, cy, outer_r = self._radar_geometry()
+        radius_km = max(1.0, float(self.cfg.flight_radius))
         contacts = []
-        n = max(1, len(flights))
-        for i, f in enumerate(flights):
-            bearing = float(int(f.heading or 0) % 360)
-            range_norm = 0.15 + (i / max(1, n)) * 0.75
+        for f in flights:
+            if f.lat is None or f.lng is None:
+                # Fall back to a faux bearing/range if the data source didn't
+                # give us a position.  Better than dropping the contact.
+                bearing = float(int(f.heading or 0) % 360)
+                range_norm = 0.5
+            else:
+                bearing, dist_km = bearing_and_distance(
+                    self.cfg.flight_lat, self.cfg.flight_lng, f.lat, f.lng
+                )
+                range_norm = min(1.0, dist_km / radius_km)
             contacts.append((bearing, range_norm, f.callsign))
         radar.draw_animation(
             surface, self.fonts, cx, cy, outer_r, contacts, t
@@ -324,6 +336,32 @@ class RichFlightScene(RichScene):
             surface.blit(alt, (col_x["alt"], y))
             surface.blit(spd, (col_x["spd"], y))
 
+    # -- geo helpers ----------------------------------------------------
+
+    def _distance_km(self, flight) -> float | None:
+        if flight.lat is None or flight.lng is None:
+            return None
+        _bearing, dist_km = bearing_and_distance(
+            self.cfg.flight_lat, self.cfg.flight_lng, flight.lat, flight.lng
+        )
+        return dist_km
+
+    def _eta_seconds(self, flight, dist_km: float | None) -> float | None:
+        if flight.lat is None or flight.lng is None:
+            return None
+        try:
+            gs = float(flight.ground_speed or 0)
+        except (TypeError, ValueError):
+            return None
+        return eta_closest_approach_seconds(
+            self.cfg.flight_lat,
+            self.cfg.flight_lng,
+            flight.lat,
+            flight.lng,
+            float(flight.heading or 0),
+            gs,
+        )
+
     # -- formatting helpers --------------------------------------------
 
     def _data_source_label(self) -> str:
@@ -357,3 +395,22 @@ class RichFlightScene(RichScene):
             return "----"
         sign = "+" if v > 0 else ""
         return f"{sign}{v}"
+
+    @staticmethod
+    def _fmt_distance(dist_km) -> str:
+        if dist_km is None:
+            return "--"
+        if dist_km >= 100:
+            return f"{int(round(dist_km))}"
+        return f"{dist_km:.1f}"
+
+    @staticmethod
+    def _fmt_eta(eta_s) -> str:
+        """Format an ETA in seconds as MM:SS (or --:-- when unknown/receding)."""
+        if eta_s is None:
+            return "--:--"
+        eta_s = int(round(eta_s))
+        m, sec = divmod(eta_s, 60)
+        if m >= 100:
+            return "99+"
+        return f"{m:02d}:{sec:02d}"

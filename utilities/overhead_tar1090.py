@@ -207,6 +207,8 @@ class Overhead:
                             vertical_speed=ac.get("baro_rate")
                             or ac.get("vert_rate")
                             or 0,
+                            lat=lat,
+                            lng=lng,
                         )
                     )
 

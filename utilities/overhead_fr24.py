@@ -238,6 +238,12 @@ class Overhead:
                 except (TypeError, ValueError):
                     heading = 0
 
+                try:
+                    live_lat = float(flight.latitude) if flight.latitude is not None else None
+                    live_lng = float(flight.longitude) if flight.longitude is not None else None
+                except (TypeError, ValueError):
+                    live_lat = live_lng = None
+
                 data.append(
                     Flight(
                         plane=plane,
@@ -256,6 +262,8 @@ class Overhead:
                         callsign=display_callsign,
                         icao_callsign=icao_callsign,
                         airline_icao=clean_field(flight.airline_icao),
+                        lat=live_lat,
+                        lng=live_lng,
                     )
                 )
 

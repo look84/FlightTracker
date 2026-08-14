@@ -297,6 +297,8 @@ class Overhead:
                             ground_speed=ground_speed,
                             heading=heading,
                             vertical_speed=vertical_speed,
+                            lat=lat,
+                            lng=lng,
                         )
                     )
 
