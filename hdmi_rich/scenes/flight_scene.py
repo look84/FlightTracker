@@ -153,7 +153,7 @@ class RichFlightScene(RichScene):
         title = plane.upper()
         if reg:
             title = f"{title}   |   REG {reg.upper()}"
-        title_surf = self.fonts.small.render(title, True, theme.ACCENT)
+        title_surf = self.fonts.medium.render(title, True, theme.ACCENT)
         surface.blit(title_surf, (rect.left, rect.top + 16))
 
     def _draw_telemetry(self, surface, flight) -> None:
