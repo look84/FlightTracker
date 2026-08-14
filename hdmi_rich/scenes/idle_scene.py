@@ -136,9 +136,11 @@ class RichIdleScene(RichScene):
 
         if desc:
             desc_surf = self.fonts.medium.render(desc, True, theme.ACCENT)
-            surface.blit(desc_surf, (inner.x, inner.y + s(220)))
+            surface.blit(desc_surf, (inner.x, inner.y + s(200)))
 
-        # Wind + humidity as a mini-table
+        # Wind + humidity as a mini-table.  Positioned tightly under the
+        # description so the last row doesn't get squeezed past the block
+        # outline in physical (540p) rendering.
         rows = [
             ("HUMIDITY", f"{humidity}%" if humidity is not None else "--"),
             (
@@ -146,8 +148,8 @@ class RichIdleScene(RichScene):
                 f"{int(wind_kph)} KM/H {wind_dir}" if wind_kph is not None else "--",
             ),
         ]
-        base_y = inner.y + s(300)
-        row_gap = s(60)
+        base_y = inner.y + s(270)
+        row_gap = s(50)
         for i, (label, value) in enumerate(rows):
             l_surf = self.fonts.small.render(label, True, theme.ACCENT)
             v_surf = self.fonts.small.render(value, True, theme.PRIMARY)
