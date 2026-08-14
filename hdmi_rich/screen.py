@@ -1,11 +1,15 @@
 """
-Fullscreen pygame surface manager for the rich HDMI UI.
+Pygame surface manager for the rich HDMI UI.
 
-Every scene draws onto a 1920x1080 *virtual* surface; at present() the
-frame is scaled-to-fit onto whatever native resolution the attached HDMI
-display reports.  This keeps every widget's coordinate math a fixed
-constant, and lets the UI look sharp on 1080p, 1440p and 4K panels
-without per-resolution layouts.
+Fullscreen mode uses ``pygame.SCALED | pygame.FULLSCREEN`` so pygame's
+SDL2 renderer owns the physical output scaling on the GPU.  That means
+we can draw straight to the display surface at logical 1920x1080 and
+skip the virtual->real memcpy that plain fullscreen requires - a big
+win on the Pi where memory bandwidth is the bottleneck.
+
+Windowed dev mode keeps the two-surface model (virtual 1920x1080 plus a
+resizable real window scaled via pygame.transform.scale) so window
+resize still works and doesn't need SDL2's renderer to cooperate.
 
 On a headless Pi (no X/Wayland) the SDL video driver is nudged to kmsdrm
 so pygame writes straight to the framebuffer from a bare tty.
@@ -22,14 +26,18 @@ VIRTUAL_H = 1080
 
 
 class RichScreen:
-    """Owns the pygame window + virtual drawing surface."""
+    """Owns the pygame display + logical drawing surface."""
 
     def __init__(self, fullscreen: bool = True, window_scale: float = 0.66):
         self.fullscreen = fullscreen
         self.window_scale = window_scale
-        self._real = None       # the actual pygame display surface
-        self.surface = None     # the 1920x1080 virtual surface scenes draw on
+        self._real = None
+        # `surface` is what scenes draw on.  Fullscreen: aliases the display
+        # surface (single-buffer, GPU-scaled by SDL2).  Windowed: a separate
+        # 1920x1080 virtual surface that we CPU-scale into the resizable window.
+        self.surface = None
         self._dest_rect = None
+        self._direct_draw = False
         self._init_pygame()
 
     def _init_pygame(self) -> None:
@@ -41,25 +49,39 @@ class RichScreen:
 
         pygame.init()
         if self.fullscreen:
-            self._real = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
+            # SCALED lets SDL2 handle the physical output scaling in hardware,
+            # so scenes can draw straight to the display surface at logical
+            # 1920x1080.  Falls back gracefully to plain FULLSCREEN on SDL
+            # builds that don't support SCALED.
+            try:
+                self._real = pygame.display.set_mode(
+                    (VIRTUAL_W, VIRTUAL_H),
+                    pygame.FULLSCREEN | pygame.SCALED,
+                    vsync=1,
+                )
+                self.surface = self._real
+                self._direct_draw = True
+            except pygame.error:
+                self._real = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
+                self.surface = pygame.Surface((VIRTUAL_W, VIRTUAL_H))
+                self._direct_draw = False
             pygame.mouse.set_visible(False)
             caption = "FlightTracker - rich"
         else:
             w = int(VIRTUAL_W * self.window_scale)
             h = int(VIRTUAL_H * self.window_scale)
             self._real = pygame.display.set_mode((w, h), pygame.RESIZABLE)
+            self.surface = pygame.Surface((VIRTUAL_W, VIRTUAL_H))
+            self._direct_draw = False
             caption = "FlightTracker - rich (windowed)"
         pygame.display.set_caption(caption)
 
-        self.surface = pygame.Surface((VIRTUAL_W, VIRTUAL_H))
         self._recompute_dest()
 
     def _recompute_dest(self) -> None:
         import pygame
 
         screen_w, screen_h = self._real.get_size()
-        # Contain-fit: whichever axis is tighter caps the scale.  Preserves
-        # the 16:9 canvas so the ATC layout never distorts.
         scale = min(screen_w / VIRTUAL_W, screen_h / VIRTUAL_H)
         dest_w = int(VIRTUAL_W * scale)
         dest_h = int(VIRTUAL_H * scale)
@@ -88,9 +110,12 @@ class RichScreen:
     def present(self) -> None:
         import pygame
 
-        # Fast path: virtual surface already matches the destination rect.
-        # Skip pygame.transform.scale (a full CPU copy even at 1:1) and blit
-        # direct.  Common case on a 1920x1080 HDMI Pi where virtual = real.
+        if self._direct_draw:
+            # Scenes drew straight to the display surface; nothing to copy.
+            pygame.display.flip()
+            return
+
+        # Windowed / fallback path: CPU-scale virtual into real.
         real_w, real_h = self._real.get_size()
         if (
             self._dest_rect.width == VIRTUAL_W
