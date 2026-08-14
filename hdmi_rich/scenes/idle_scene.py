@@ -39,60 +39,16 @@ class RichIdleScene(RichScene):
         return False
 
     def _weather(self):
-        import sys
-        import traceback
-
         if self._weather_service is None:
             try:
                 from scenes.idle.themes.theme_utilities import WeatherService
 
                 self._weather_service = WeatherService.instance()
-                print(
-                    "[rich-idle] WeatherService instantiated OK", file=sys.stderr,
-                    flush=True,
-                )
-            except Exception as exc:
-                # MemoryLogHandler discards tracebacks, so print directly to
-                # stderr so the actual cause is visible on the console.
-                print(
-                    f"[rich-idle] WeatherService instantiation FAILED: {exc!r}",
-                    file=sys.stderr,
-                    flush=True,
-                )
-                traceback.print_exc()
+            except Exception:
                 return None
         try:
-            data = self._weather_service.get()
-            if data is None:
-                if not getattr(self, "_weather_reported_none", False):
-                    print(
-                        "[rich-idle] WeatherService.get() returned None "
-                        "(fetch in progress or failing)",
-                        file=sys.stderr,
-                        flush=True,
-                    )
-                    self._weather_reported_none = True
-            else:
-                if not getattr(self, "_weather_reported_data", False):
-                    from setup.configuration import Config
-
-                    cfg = Config.instance()
-                    print(
-                        f"[rich-idle] WeatherService.get() returned dict "
-                        f"({len(data)} keys, daily={len(data.get('daily') or [])}, "
-                        f"api_key_set={bool(cfg.weatherapi_key)})",
-                        file=sys.stderr,
-                        flush=True,
-                    )
-                    self._weather_reported_data = True
-            return data
-        except Exception as exc:
-            print(
-                f"[rich-idle] WeatherService.get() FAILED: {exc!r}",
-                file=sys.stderr,
-                flush=True,
-            )
-            traceback.print_exc()
+            return self._weather_service.get()
+        except Exception:
             return None
 
     def _quadrants(self):
