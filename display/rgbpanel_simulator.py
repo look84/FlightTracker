@@ -152,12 +152,12 @@ class SimulatorPanel(RGBPanel):
 
         print(
             "\n"
-            "┌--------------------------------------------------┐\n"
-            "│  RGB Matrix simulator - capture keys             │\n"
-            "│                                                  │\n"
-            "│  P  - save a photo to captures/                  │\n"
-            "│  R  - toggle video recording on/off              │\n"
-            "└--------------------------------------------------┘\n"
+            "+--------------------------------------------------+\n"
+            "|  RGB Matrix simulator - capture keys             |\n"
+            "|                                                  |\n"
+            "|  P  - save a photo to captures/                  |\n"
+            "|  R  - toggle video recording on/off              |\n"
+            "+--------------------------------------------------+\n"
         )
 
     def _build_mask(self) -> None:
@@ -276,7 +276,7 @@ class SimulatorPanel(RGBPanel):
         os.makedirs(_CAPTURE_DIR, exist_ok=True)
         path = os.path.join(_CAPTURE_DIR, f"{self._timestamp()}.png")
         pygame.image.save(self._screen, path)
-        print(f"📷  Photo saved: {path}")
+        print(f"[photo] Saved: {path}")
 
     def _toggle_recording(self) -> None:
         if not self._recording:
@@ -285,9 +285,9 @@ class SimulatorPanel(RGBPanel):
             os.makedirs(self._rec_dir, exist_ok=True)
             self._rec_frame = 0
             self._recording = True
-            print(f"⏺  Recording started: {self._rec_dir}/")
+            print(f"[rec] Recording started: {self._rec_dir}/")
         else:
-            print(f"⏹  Recording stopped: {self._rec_frame} frames in {self._rec_dir}/")
+            print(f"[rec] Recording stopped: {self._rec_frame} frames in {self._rec_dir}/")
             self._recording = False
             self._rec_dir = None
             self._rec_frame = 0
