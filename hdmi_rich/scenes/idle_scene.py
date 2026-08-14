@@ -211,7 +211,7 @@ class RichIdleScene(RichScene):
             moon = astro.get("moon_phase")
             illum = astro.get("moon_illumination")
 
-        # Fallback: compute sunrise/sunset from lat/lng
+        # Fallback: compute sunrise/sunset from lat/lng.
         if not sunrise or not sunset:
             try:
                 from utilities.sun_times import approx_sunrise_sunset
@@ -221,6 +221,21 @@ class RichIdleScene(RichScene):
                 )
                 sunrise = sunrise or sr_t.strftime("%H:%M")
                 sunset = sunset or ss_t.strftime("%H:%M")
+            except Exception:
+                pass
+
+        # Fallback: compute moon phase + illumination locally so the ASTRO
+        # block still says something meaningful when weather is offline or
+        # the API plan doesn't include the moon fields.
+        if not moon or illum is None:
+            try:
+                from hdmi_rich.moon import moon_phase_illumination
+
+                local_name, local_illum = moon_phase_illumination()
+                if not moon:
+                    moon = local_name
+                if illum is None:
+                    illum = local_illum
             except Exception:
                 pass
 

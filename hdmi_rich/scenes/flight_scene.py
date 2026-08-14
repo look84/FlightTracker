@@ -41,9 +41,9 @@ RADAR_RIGHT = s(1888)
 # block chrome; a vertical divider separates them.
 CONTACTS_LEFT = s(32)
 CONTACTS_RIGHT = s(1888)
-CONTACTS_HEIGHT = s(240)
+CONTACTS_HEIGHT = s(260)
 CONTACTS_TOP = CONTENT_BOT - CONTACTS_HEIGHT
-CONTACTS_ROW_H = s(44)
+CONTACTS_ROW_H = s(60)
 CONTACTS_COLUMNS = 2
 CONTACTS_ROWS_PER_COL = 3
 CONTACTS_MAX_ROWS = CONTACTS_COLUMNS * CONTACTS_ROWS_PER_COL  # 6
@@ -82,7 +82,7 @@ class RichFlightScene(RichScene):
             self._chrome.get(screen.surface, self._render_static), (0, 0)
         )
 
-        flights = self.overhead.data
+        flights = self._sorted_flights(self.overhead.data)
         primary_index = self._pick_primary_index(flights, t)
         primary = flights[primary_index] if flights else None
 
@@ -133,10 +133,30 @@ class RichFlightScene(RichScene):
                 bg.blit(hdr, (x, col_rect.y))
 
         # Aircraft separator line
-        sep_y = CONTENT_TOP + s(260)
+        sep_y = CONTENT_TOP + s(240)
         pygame.draw.line(
             bg, theme.DIM, (CARD_LEFT, sep_y), (CARD_RIGHT, sep_y), 1
         )
+
+    # -- ordering -------------------------------------------------------
+
+    def _sorted_flights(self, flights):
+        """Return *flights* ordered by great-circle distance from observer.
+
+        Contacts with no reported position fall to the back of the list.
+        """
+        if not flights:
+            return flights
+        obs_lat = self.cfg.flight_lat
+        obs_lng = self.cfg.flight_lng
+
+        def key(f):
+            if f.lat is None or f.lng is None:
+                return float("inf")
+            _bearing, dist = bearing_and_distance(obs_lat, obs_lng, f.lat, f.lng)
+            return dist
+
+        return sorted(flights, key=key)
 
     # -- cycling --------------------------------------------------------
 
@@ -203,7 +223,7 @@ class RichFlightScene(RichScene):
 
     def _draw_aircraft(self, surface, flight) -> None:
         # Separator line above the title is part of static chrome now.
-        y = CONTENT_TOP + s(260)
+        y = CONTENT_TOP + s(240)
         plane = flight.plane or "UNKNOWN TYPE"
         reg = flight.registration or ""
         title = plane.upper()
@@ -213,7 +233,7 @@ class RichFlightScene(RichScene):
         surface.blit(title_surf, (CARD_LEFT, y + s(16)))
 
     def _draw_telemetry(self, surface, flight) -> None:
-        y = CONTENT_TOP + s(400)
+        y = CONTENT_TOP + s(380)
         row_h = s(100)
         col_w = (CARD_RIGHT - CARD_LEFT) // 3
 
@@ -356,18 +376,18 @@ class RichFlightScene(RichScene):
             is_current = idx == current_index
             colour = theme.PRIMARY if is_current else theme.ACCENT
             if is_current:
-                chev = self.fonts.tiny.render(">", True, theme.PRIMARY)
+                chev = self.fonts.small.render(">", True, theme.PRIMARY)
                 surface.blit(chev, (col_x["chev"], y - s(2)))
-            call = self.fonts.tiny.render(
+            call = self.fonts.small.render(
                 (f.callsign or "?").upper(), True, colour
             )
-            hdg = self.fonts.tiny.render(
+            hdg = self.fonts.small.render(
                 f"{int(f.heading or 0) % 360:03d}", True, colour
             )
-            alt = self.fonts.tiny.render(
+            alt = self.fonts.small.render(
                 self._fmt_altitude(f.altitude), True, colour
             )
-            spd = self.fonts.tiny.render(
+            spd = self.fonts.small.render(
                 self._fmt_speed(f.ground_speed), True, colour
             )
             surface.blit(call, (col_x["callsign"], y))
