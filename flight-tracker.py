@@ -426,34 +426,6 @@ def _warn_if_root() -> None:
         )
 
 
-def _start_flask_background(cfg: Config) -> None:
-    """Kick Flask off on a daemon thread without blocking on readiness.
-
-    Used by the rich HDMI boot path where we don't need to synchronise a
-    splash-screen countdown against Flask's port binding.
-    """
-    ready = threading.Event()
-    result: dict = {}
-    threading.Thread(
-        target=flask_load,
-        args=(ready, result),
-        daemon=True,
-        name="flask-load-rich",
-    ).start()
-    # Poke the app_ready event once Flask has bound its port so anything
-    # gating on it (background scene threads, etc.) unblocks.
-    def _mark_ready() -> None:
-        ready.wait()
-        try:
-            from web.app import app_ready
-
-            app_ready.set()
-        except Exception:
-            pass
-
-    threading.Thread(target=_mark_ready, daemon=True, name="flask-ready-mark").start()
-
-
 def run_flight_tracker(disable_tests: bool = False):
     setup_logging()
     logger = logging.getLogger("startup")
@@ -464,10 +436,8 @@ def run_flight_tracker(disable_tests: bool = False):
     logger.info("FlightTracker starting (log level: %s)", cfg.log_level)
 
     if is_rich_mode():
-        # Rich HDMI: skip RGB panel init, splash, and connectivity tests.
-        # Flask still runs for web-config access.
-        if cfg.web_interface_enabled:
-            _start_flask_background(cfg)
+        # Rich HDMI owns its own boot: pygame init, loading/QR scene,
+        # connectivity checks, Flask startup, then the main scene loop.
         from hdmi_rich import run_rich
 
         run_rich(cfg, fullscreen=rich_fullscreen())
