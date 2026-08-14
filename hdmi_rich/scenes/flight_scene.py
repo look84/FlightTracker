@@ -54,6 +54,10 @@ MAIN_BOT = CONTACTS_TOP - s(20)
 RADAR_BOT = MAIN_BOT
 
 CYCLE_SECONDS = 5.0
+# How long to stay on the flight scene after the last non-empty overhead
+# refresh.  Prevents flapping to STANDBY every time a single aircraft
+# briefly leaves the zone between fetches.
+HAS_DATA_GRACE_S = 60.0
 
 
 class RichFlightScene(RichScene):
@@ -67,9 +71,23 @@ class RichFlightScene(RichScene):
         self._cycle_last = 0.0
         self._last_flight_id = None
         self._chrome = SceneChrome()
+        self._last_had_data_at: float | None = None
+        # Cached copy of the last non-empty sorted flights list.  During
+        # the grace window (see HAS_DATA_GRACE_S) we render this so the
+        # scene doesn't blank out mid-refresh.
+        self._last_flights: list = []
 
     def has_data(self) -> bool:
-        return bool(getattr(self.overhead, "data", None))
+        """True while there are flights overhead, plus a grace window after
+        the last non-empty refresh so we don't flap to STANDBY the moment
+        a single aircraft briefly leaves the zone between fetches."""
+        raw = getattr(self.overhead, "data", None) or []
+        if raw:
+            self._last_had_data_at = time.monotonic()
+            return True
+        if self._last_had_data_at is None:
+            return False
+        return time.monotonic() - self._last_had_data_at < HAS_DATA_GRACE_S
 
     def on_enter(self) -> None:
         self._cycle_index = 0
@@ -82,7 +100,15 @@ class RichFlightScene(RichScene):
             self._chrome.get(screen.surface, self._render_static), (0, 0)
         )
 
-        flights = self._sorted_flights(self.overhead.data)
+        raw = self._sorted_flights(self.overhead.data)
+        if raw:
+            self._last_flights = raw
+            flights = raw
+        else:
+            # Grace window: fall back to the last non-empty snapshot so the
+            # scene doesn't blank out between overhead refreshes.  Values
+            # (ALT/SPD/HDG/positions) are up to HAS_DATA_GRACE_S stale.
+            flights = self._last_flights
         primary_index = self._pick_primary_index(flights, t)
         primary = flights[primary_index] if flights else None
 
