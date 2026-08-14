@@ -39,16 +39,26 @@ def draw(surface, fonts, title: str, callsign: str | None = None) -> None:
         surface.blit(
             label_surf, (_PAD_X, HEIGHT // 2 - label_surf.get_height() // 2)
         )
-        # Centred callsign value, flashing at 1 Hz.
+        # Centred callsign in an inverse-video "flight strip" block -
+        # filled green rect with black text - flashing at 1 Hz for a
+        # distinctly ATC/CRT feel.  Tight vertical padding keeps the
+        # block inside the fixed header height without needing to
+        # cascade a taller HEIGHT through every scene's layout math.
         if (time.monotonic() % 1.0) < 0.7:
-            cs_surf = fonts.large.render(callsign.upper(), True, theme.PRIMARY)
-            surface.blit(
-                cs_surf,
-                (
-                    (w - cs_surf.get_width()) // 2,
-                    HEIGHT // 2 - cs_surf.get_height() // 2,
-                ),
+            cs_text = callsign.upper()
+            cs_surf = fonts.large.render(cs_text, True, theme.BACKGROUND)
+            pad_x = s(28)
+            pad_y = s(4)
+            block_w = cs_surf.get_width() + pad_x * 2
+            block_h = cs_surf.get_height() + pad_y * 2
+            block_x = (w - block_w) // 2
+            block_y = HEIGHT // 2 - block_h // 2
+            pygame.draw.rect(
+                surface,
+                theme.PRIMARY,
+                pygame.Rect(block_x, block_y, block_w, block_h),
             )
+            surface.blit(cs_surf, (block_x + pad_x, block_y + pad_y))
     else:
         # Idle title only, left-padded, solid.
         title_surf = fonts.medium.render(title.upper(), True, chrome_colour)
