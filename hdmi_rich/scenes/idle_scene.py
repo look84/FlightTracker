@@ -96,10 +96,16 @@ class RichIdleScene(RichScene):
 
     def _draw_clock(self, surface, rect):
         inner = block.inner(rect)
-        now = datetime.now()
+        # astimezone() attaches the local zoneinfo; tzname() returns the
+        # short abbreviation ("BST" / "PDT" / etc.).  Falls back to empty
+        # string on platforms without a configured local zone.
+        now = datetime.now().astimezone()
+        tz_abbr = (now.tzname() or "").upper()
         time_str = now.strftime("%H:%M:%S")
         date_str = now.strftime("%A").upper()
         sub_str = now.strftime("%d %b %Y").upper()
+        if tz_abbr:
+            sub_str = f"{sub_str}  |  {tz_abbr}"
 
         big = self.fonts.xxlarge
         time_surf = big.render(time_str, True, theme.PRIMARY)
