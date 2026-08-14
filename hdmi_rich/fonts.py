@@ -27,6 +27,7 @@ class Fonts:
         self.medium = pygame.font.Font(FONT_PATH, 62)
         self.large = pygame.font.Font(FONT_PATH, 92)
         self.xlarge = pygame.font.Font(FONT_PATH, 150)
+        self.xxlarge = pygame.font.Font(FONT_PATH, 220)
         self._cache: dict[int, "pygame.font.Font"] = {}
 
     def at(self, size: int):

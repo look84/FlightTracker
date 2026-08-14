@@ -90,7 +90,7 @@ class RichIdleScene(RichScene):
         date_str = now.strftime("%A").upper()
         sub_str = now.strftime("%d %b %Y").upper()
 
-        big = self.fonts.at(220)
+        big = self.fonts.xxlarge
         time_surf = big.render(time_str, True, theme.PRIMARY)
         surface.blit(
             time_surf,
@@ -119,7 +119,7 @@ class RichIdleScene(RichScene):
         wind_kph = weather.get("wind_kph")
         wind_dir = (weather.get("wind_dir") or "").upper()
 
-        big = self.fonts.at(240)
+        big = self.fonts.xxlarge
         temp_surf = big.render(temp, True, theme.PRIMARY)
         surface.blit(temp_surf, (inner.x, inner.y + 10))
 
@@ -168,7 +168,7 @@ class RichIdleScene(RichScene):
                 day_surf,
                 (col_x + (col_w - day_surf.get_width()) // 2, inner.y + 20),
             )
-            hi_surf = self.fonts.at(100).render(hi, True, theme.PRIMARY)
+            hi_surf = self.fonts.large.render(hi, True, theme.PRIMARY)
             surface.blit(
                 hi_surf,
                 (col_x + (col_w - hi_surf.get_width()) // 2, inner.y + 90),

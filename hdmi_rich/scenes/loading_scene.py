@@ -25,7 +25,7 @@ class RichLoadingScene:
         header.draw(surface, self.fonts, "FLIGHTTRACKER", None)
 
         # Boot banner
-        title_font = self.fonts.at(220)
+        title_font = self.fonts.xxlarge
         title_surf = title_font.render("FLIGHT TRACKER", True, theme.PRIMARY)
         surface.blit(
             title_surf,
