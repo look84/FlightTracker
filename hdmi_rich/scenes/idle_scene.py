@@ -139,10 +139,10 @@ class RichIdleScene(RichScene):
         for i, (label, value) in enumerate(rows):
             l_surf = self.fonts.small.render(label, True, theme.ACCENT)
             v_surf = self.fonts.small.render(value, True, theme.PRIMARY)
-            surface.blit(l_surf, (inner.x, base_y + i * 40))
+            surface.blit(l_surf, (inner.x, base_y + i * 60))
             surface.blit(
                 v_surf,
-                (inner.right - v_surf.get_width(), base_y + i * 40),
+                (inner.right - v_surf.get_width(), base_y + i * 60),
             )
 
     def _draw_forecast(self, surface, rect, weather):

@@ -189,7 +189,7 @@ class RichSatelliteScene(RichScene):
             ("+ELAPSED", _fmt_hms(max(0, elapsed))),
             ("-REMAIN", _fmt_hms(max(0, remaining))),
         ]
-        row_h = 40
+        row_h = 60
         for i, (label, value) in enumerate(rows):
             y = inner.y + 4 + i * row_h
             l = self.fonts.small.render(label, True, theme.ACCENT)
@@ -239,13 +239,13 @@ class RichSatelliteScene(RichScene):
         if not upcoming:
             self._dash(surface, inner, "NO UPCOMING PASSES")
             return
-        row_h = 38
+        row_h = 60
         headers = [("NAME", inner.x), ("AOS", inner.x + 360), ("MAX EL", inner.right - 100)]
         for label, x in headers:
             h = self.fonts.small.render(label, True, theme.FAINT)
             surface.blit(h, (x, inner.y))
         for i, w in enumerate(upcoming):
-            y = inner.y + 30 + i * row_h
+            y = inner.y + 44 + i * row_h
             name = self.fonts.small.render(w.name.upper()[:24], True, theme.PRIMARY)
             aos = self.fonts.small.render(
                 w.aos.strftime("%d %b %H:%M UTC"), True, theme.PRIMARY

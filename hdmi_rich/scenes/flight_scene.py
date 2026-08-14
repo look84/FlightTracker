@@ -144,7 +144,7 @@ class RichFlightScene(RichScene):
 
     def _draw_aircraft(self, surface, flight) -> None:
         y = CONTENT_TOP + 260
-        rect = pygame.Rect(CARD_LEFT, y, CARD_RIGHT - CARD_LEFT, 60)
+        rect = pygame.Rect(CARD_LEFT, y, CARD_RIGHT - CARD_LEFT, 90)
         pygame.draw.line(
             surface, theme.DIM, (rect.left, rect.top), (rect.right, rect.top), 1
         )
@@ -154,7 +154,7 @@ class RichFlightScene(RichScene):
         if reg:
             title = f"{title}   |   REG {reg.upper()}"
         title_surf = self.fonts.small.render(title, True, theme.ACCENT)
-        surface.blit(title_surf, (rect.left, rect.top + 12))
+        surface.blit(title_surf, (rect.left, rect.top + 16))
 
     def _draw_telemetry(self, surface, flight) -> None:
         y = CONTENT_TOP + 380
@@ -244,10 +244,10 @@ class RichFlightScene(RichScene):
             h = self.fonts.tiny.render(label, True, theme.FAINT)
             surface.blit(h, (x, inner.y))
 
-        row_h = 40
-        max_rows = max(1, (inner.height - 40) // row_h)
+        row_h = 62
+        max_rows = max(1, (inner.height - 48) // row_h)
         for i, f in enumerate(flights[:max_rows]):
-            y = inner.y + 36 + i * row_h
+            y = inner.y + 44 + i * row_h
             is_current = i == current_index
             colour = theme.PRIMARY if is_current else theme.ACCENT
             if is_current:

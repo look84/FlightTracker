@@ -11,7 +11,7 @@ import pygame
 
 from hdmi_rich import theme
 
-HEIGHT = 80
+HEIGHT = 100
 
 
 def draw(surface, fonts, y: int, message: str) -> None:
