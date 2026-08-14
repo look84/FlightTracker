@@ -39,16 +39,44 @@ class RichIdleScene(RichScene):
         return False
 
     def _weather(self):
+        import logging
+
+        log = logging.getLogger("rich-idle")
         if self._weather_service is None:
             try:
                 from scenes.idle.themes.theme_utilities import WeatherService
 
                 self._weather_service = WeatherService.instance()
+                log.info("WeatherService instantiated")
             except Exception:
+                log.exception("WeatherService instantiation failed")
                 return None
         try:
-            return self._weather_service.get()
+            data = self._weather_service.get()
+            # Log the transition None <-> has-data exactly once each way so
+            # we don't spam the log at 20fps.
+            if data is None:
+                if not getattr(self, "_weather_reported_none", False):
+                    log.warning(
+                        "WeatherService.get() returned None - check API key + network"
+                    )
+                    self._weather_reported_none = True
+            else:
+                if not getattr(self, "_weather_reported_data", False):
+                    from setup.configuration import Config
+
+                    cfg = Config.instance()
+                    log.info(
+                        "WeatherService.get() returned dict with %d keys; "
+                        "daily length=%d; api_key set=%s",
+                        len(data),
+                        len(data.get("daily") or []),
+                        bool(cfg.weatherapi_key),
+                    )
+                    self._weather_reported_data = True
+            return data
         except Exception:
+            log.exception("WeatherService.get() failed")
             return None
 
     def _quadrants(self):

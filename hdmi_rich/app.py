@@ -47,6 +47,9 @@ class RichDisplay:
 
         # -- Phase 2: main scene loop --------------------------------------
         overhead, refresh_interval = self._build_overhead()
+        # Kick WeatherService before the render loop so the idle scene has
+        # data by the time it's picked (instead of racing the first fetch).
+        self._start_weather_service()
         scenes = [
             RichIdleScene(self.cfg, fonts),
             RichFlightScene(overhead, self.cfg, fonts),
@@ -176,6 +179,17 @@ class RichDisplay:
         from utilities.overhead_fr24 import Overhead
 
         return Overhead(), 30
+
+    def _start_weather_service(self):
+        """Kick the shared WeatherService singleton so its background fetch
+        starts before the render loop, not on first idle-scene draw."""
+        try:
+            from scenes.idle.themes.theme_utilities import WeatherService
+
+            WeatherService.instance()
+            self.logger.info("WeatherService started at boot")
+        except Exception:
+            self.logger.exception("WeatherService boot start failed")
 
     def _start_tle_manager(self):
         """Instantiate and start the shared TLEManager so pass computation

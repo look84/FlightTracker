@@ -17,10 +17,16 @@ _PAD_X = s(24)
 
 
 def draw(surface, fonts, title: str, callsign: str | None = None) -> None:
+    """Draw the top banner.  When *callsign* is present the outline + title
+    switch from amber (STANDBY / idle chrome) to phosphor green (an active
+    scene) so a glance at the top bar tells you the display state."""
     w = surface.get_width()
-    pygame.draw.rect(surface, theme.ACCENT, pygame.Rect(0, 0, w, HEIGHT), 2)
+    is_active = bool(callsign)
+    chrome_colour = theme.PRIMARY if is_active else theme.ACCENT
 
-    title_surf = fonts.medium.render(title.upper(), True, theme.ACCENT)
+    pygame.draw.rect(surface, chrome_colour, pygame.Rect(0, 0, w, HEIGHT), 2)
+
+    title_surf = fonts.medium.render(title.upper(), True, chrome_colour)
     surface.blit(title_surf, (_PAD_X, HEIGHT // 2 - title_surf.get_height() // 2))
 
     if callsign:
