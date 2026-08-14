@@ -158,7 +158,7 @@ class RichFlightScene(RichScene):
 
     def _draw_telemetry(self, surface, flight) -> None:
         y = CONTENT_TOP + 380
-        row_h = 110
+        row_h = 130
         col_w = (CARD_RIGHT - CARD_LEFT) // 3
 
         rows = [
@@ -246,9 +246,18 @@ class RichFlightScene(RichScene):
 
         row_h = 62
         max_rows = max(1, (inner.height - 48) // row_h)
-        for i, f in enumerate(flights[:max_rows]):
+        # Window the visible slice so the currently-featured flight is
+        # always on screen when we cycle past the first max_rows contacts.
+        if current_index < max_rows:
+            window_start = 0
+        else:
+            window_start = current_index - max_rows + 1
+        window_start = min(window_start, max(0, len(flights) - max_rows))
+        visible = flights[window_start : window_start + max_rows]
+        for i, f in enumerate(visible):
+            actual_index = window_start + i
             y = inner.y + 44 + i * row_h
-            is_current = i == current_index
+            is_current = actual_index == current_index
             colour = theme.PRIMARY if is_current else theme.ACCENT
             if is_current:
                 chev = self.fonts.small.render(">", True, theme.PRIMARY)
