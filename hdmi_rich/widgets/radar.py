@@ -16,7 +16,7 @@ import pygame
 
 from hdmi_rich import theme
 
-SWEEP_PERIOD_S = 4.0     # one full rotation
+SWEEP_PERIOD_S = 8.0     # one full rotation (slower reads smoother on a Pi)
 RING_COUNT = 4           # 25 / 50 / 75 / 100 % rings
 BLIP_GLOW_S = 1.5        # how long a blip stays bright after sweep passes
 
@@ -74,8 +74,8 @@ def draw(
 
 def _draw_sweep_wedge(surface, cx: int, cy: int, radius: int, angle_deg: float) -> None:
     """Draw a fading wedge behind the leading sweep line."""
-    steps = 28
-    span = 55  # degrees of trailing wedge
+    steps = 14           # halved from 28 to cut per-frame work on the Pi
+    span = 55            # degrees of trailing wedge
     for i in range(steps):
         frac = i / steps
         theta = math.radians(angle_deg - span * frac - 90)
