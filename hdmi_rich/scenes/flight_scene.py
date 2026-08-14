@@ -1,24 +1,30 @@
 """
 Rich ATC-style flight scene.
 
-Shows the closest overhead aircraft in a data card on the left, a radar
-widget on the right, and a header/ticker top+bottom.  Reuses the same
-``Overhead`` instance the classic display uses.
+Layout:
+    Left column  - primary data card (route + telemetry) for the flight
+                   currently featured.  When multiple flights are in
+                   range the featured flight cycles every CYCLE_SECONDS.
+    Top right    - radar (square-ish, 3/5 of the right column height).
+    Bottom right - CONTACTS panel: tabular list of every active flight,
+                   with a chevron marking the currently-featured one.
+    Header/ticker - top and bottom bars, standard chrome.
 
-Radar positioning caveat (Phase 1): the ``Flight`` dataclass doesn't
-carry lat/lng, so blip range is derived from the sort index (closest =
-inner ring) and bearing from the aircraft's heading (direction of
-travel, not bearing from observer).  Piping lat/lng through the data
-pipeline is a Phase 2 improvement.
+Radar positioning caveat: the ``Flight`` dataclass doesn't carry
+lat/lng, so blip range is derived from the sort index (closest =
+inner ring) and bearing from the aircraft's heading.  Piping lat/lng
+through the data pipeline is a later improvement.
 """
 
 from __future__ import annotations
+
+import time
 
 import pygame
 
 from hdmi_rich import theme
 from hdmi_rich.scenes.scene_base import RichScene
-from hdmi_rich.widgets import field, header, radar, ticker
+from hdmi_rich.widgets import block, field, header, radar, ticker
 
 CONTENT_TOP = header.HEIGHT + 24
 CONTENT_BOT = 1080 - ticker.HEIGHT - 24
@@ -26,6 +32,9 @@ CARD_LEFT = 32
 CARD_RIGHT = 1000
 RADAR_LEFT = 1040
 RADAR_RIGHT = 1888
+RADAR_BOT = CONTENT_TOP + 600
+CONTACTS_TOP = RADAR_BOT + 24
+CYCLE_SECONDS = 5.0
 
 
 class RichFlightScene(RichScene):
@@ -35,28 +44,33 @@ class RichFlightScene(RichScene):
         self.overhead = overhead
         self.cfg = cfg
         self.fonts = fonts
+        self._cycle_index = 0
+        self._cycle_last = 0.0
+        self._last_flight_id = None
 
     def has_data(self) -> bool:
         return bool(getattr(self.overhead, "data", None))
 
+    def on_enter(self) -> None:
+        self._cycle_index = 0
+        self._cycle_last = time.monotonic()
+
     def draw(self, screen, t: float) -> None:
         flights = self.overhead.data
-        primary = flights[0] if flights else None
+        primary_index = self._pick_primary_index(flights, t)
+        primary = flights[primary_index] if flights else None
 
-        # -- Header --------------------------------------------------------
         callsign = primary.callsign if primary else None
         header.draw(screen.surface, self.fonts, "ACTIVE CONTACT", callsign)
 
-        # -- Data card ----------------------------------------------------
         if primary:
             self._draw_route(screen.surface, primary)
             self._draw_aircraft(screen.surface, primary)
             self._draw_telemetry(screen.surface, primary)
 
-        # -- Radar --------------------------------------------------------
         self._draw_radar(screen.surface, flights, t)
+        self._draw_contacts(screen.surface, flights, primary_index)
 
-        # -- Ticker -------------------------------------------------------
         n_contacts = len(flights)
         source = self._data_source_label()
         message = (
@@ -65,10 +79,34 @@ class RichFlightScene(RichScene):
         )
         ticker.draw(screen.surface, self.fonts, 1080 - ticker.HEIGHT, message)
 
+    # -- cycling --------------------------------------------------------
+
+    def _pick_primary_index(self, flights, t: float) -> int:
+        """Advance the featured-flight cycle when multiple contacts are in range.
+
+        Resets to the closest (index 0) whenever the list shrinks below the
+        current index so we never point at a stale flight.
+        """
+        n = len(flights)
+        if n == 0:
+            self._cycle_index = 0
+            return 0
+        if n == 1:
+            self._cycle_index = 0
+            self._cycle_last = t
+            self._last_flight_id = flights[0].flight_id
+            return 0
+        if t - self._cycle_last >= CYCLE_SECONDS:
+            self._cycle_index = (self._cycle_index + 1) % n
+            self._cycle_last = t
+        else:
+            self._cycle_index %= n
+        self._last_flight_id = flights[self._cycle_index].flight_id
+        return self._cycle_index
+
     # -- data card sections ---------------------------------------------
 
     def _draw_route(self, surface, flight) -> None:
-        # BIG origin / arrow / destination header near the top of the card.
         y = CONTENT_TOP
         origin = flight.origin or "???"
         dest = flight.destination or "???"
@@ -89,7 +127,6 @@ class RichFlightScene(RichScene):
             (x + origin_surf.get_width() + arrow_surf.get_width() + gap * 2, y),
         )
 
-        # Sub-line: full airport names
         y2 = y + origin_surf.get_height() + 4
         subline = self._subline_for_route(flight)
         if subline:
@@ -105,7 +142,7 @@ class RichFlightScene(RichScene):
         return ""
 
     def _draw_aircraft(self, surface, flight) -> None:
-        y = CONTENT_TOP + 220
+        y = CONTENT_TOP + 260
         rect = pygame.Rect(CARD_LEFT, y, CARD_RIGHT - CARD_LEFT, 60)
         pygame.draw.line(
             surface, theme.DIM, (rect.left, rect.top), (rect.right, rect.top), 1
@@ -119,12 +156,10 @@ class RichFlightScene(RichScene):
         surface.blit(title_surf, (rect.left, rect.top + 12))
 
     def _draw_telemetry(self, surface, flight) -> None:
-        y = CONTENT_TOP + 320
-        row_h = 92
+        y = CONTENT_TOP + 380
+        row_h = 110
         col_w = (CARD_RIGHT - CARD_LEFT) // 3
 
-        # ATC readouts are ft/kts by convention; ignore the user's LED-panel
-        # unit preferences here to keep the aesthetic on-theme.
         rows = [
             [
                 ("ALT", self._fmt_altitude(flight.altitude), "FT"),
@@ -148,12 +183,11 @@ class RichFlightScene(RichScene):
 
     def _draw_radar(self, surface, flights, t: float) -> None:
         radar_w = RADAR_RIGHT - RADAR_LEFT
-        radar_h = CONTENT_BOT - CONTENT_TOP
+        radar_h = RADAR_BOT - CONTENT_TOP
         cx = RADAR_LEFT + radar_w // 2
         cy = CONTENT_TOP + radar_h // 2
         outer_r = min(radar_w, radar_h) // 2 - 40
 
-        # Faked positions: fan by heading, range by sort index.
         contacts = []
         n = max(1, len(flights))
         for i, f in enumerate(flights):
@@ -171,6 +205,65 @@ class RichFlightScene(RichScene):
             t,
             outer_range_label=f"{int(self.cfg.flight_radius)} KM",
         )
+
+    # -- contacts panel -------------------------------------------------
+
+    def _draw_contacts(self, surface, flights, current_index: int) -> None:
+        rect = pygame.Rect(
+            RADAR_LEFT, CONTACTS_TOP, RADAR_RIGHT - RADAR_LEFT, CONTENT_BOT - CONTACTS_TOP
+        )
+        inner = block.draw(surface, self.fonts, rect, "CONTACTS")
+
+        if not flights:
+            msg = self.fonts.small.render("NO CONTACTS", True, theme.FAINT)
+            surface.blit(
+                msg,
+                (
+                    inner.centerx - msg.get_width() // 2,
+                    inner.centery - msg.get_height() // 2,
+                ),
+            )
+            return
+
+        col_x = {
+            "chev": inner.x,
+            "callsign": inner.x + 40,
+            "hdg": inner.x + 340,
+            "alt": inner.x + 480,
+            "spd": inner.right - 140,
+        }
+        # Header row
+        headers = [
+            ("CALLSIGN", col_x["callsign"]),
+            ("HDG", col_x["hdg"]),
+            ("ALT", col_x["alt"]),
+            ("SPD", col_x["spd"]),
+        ]
+        for label, x in headers:
+            h = self.fonts.tiny.render(label, True, theme.FAINT)
+            surface.blit(h, (x, inner.y))
+
+        row_h = 40
+        max_rows = max(1, (inner.height - 40) // row_h)
+        for i, f in enumerate(flights[:max_rows]):
+            y = inner.y + 36 + i * row_h
+            is_current = i == current_index
+            colour = theme.PRIMARY if is_current else theme.ACCENT
+            if is_current:
+                chev = self.fonts.small.render(">", True, theme.PRIMARY)
+                surface.blit(chev, (col_x["chev"], y - 4))
+            call = self.fonts.small.render(
+                (f.callsign or "?").upper(), True, colour
+            )
+            hdg = self.fonts.small.render(
+                f"{int(f.heading or 0) % 360:03d}", True, colour
+            )
+            alt = self.fonts.small.render(self._fmt_altitude(f.altitude), True, colour)
+            spd = self.fonts.small.render(self._fmt_speed(f.ground_speed), True, colour)
+            surface.blit(call, (col_x["callsign"], y))
+            surface.blit(hdg, (col_x["hdg"], y))
+            surface.blit(alt, (col_x["alt"], y))
+            surface.blit(spd, (col_x["spd"], y))
 
     # -- formatting helpers --------------------------------------------
 

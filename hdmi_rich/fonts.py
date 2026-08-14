@@ -22,11 +22,11 @@ class Fonts:
         import pygame
 
         pygame.font.init()
-        self.tiny = pygame.font.Font(FONT_PATH, 22)
-        self.small = pygame.font.Font(FONT_PATH, 32)
-        self.medium = pygame.font.Font(FONT_PATH, 48)
-        self.large = pygame.font.Font(FONT_PATH, 72)
-        self.xlarge = pygame.font.Font(FONT_PATH, 120)
+        self.tiny = pygame.font.Font(FONT_PATH, 28)
+        self.small = pygame.font.Font(FONT_PATH, 42)
+        self.medium = pygame.font.Font(FONT_PATH, 62)
+        self.large = pygame.font.Font(FONT_PATH, 92)
+        self.xlarge = pygame.font.Font(FONT_PATH, 150)
         self._cache: dict[int, "pygame.font.Font"] = {}
 
     def at(self, size: int):
