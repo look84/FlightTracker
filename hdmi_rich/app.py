@@ -18,6 +18,7 @@ from hdmi_rich.fonts import Fonts
 from hdmi_rich.scenes.flight_scene import RichFlightScene
 from hdmi_rich.scenes.idle_scene import RichIdleScene
 from hdmi_rich.scenes.loading_scene import RichLoadingScene
+from hdmi_rich.scenes.satellite_scene import RichSatelliteScene
 from hdmi_rich.scenes.scene_base import RichSceneManager
 from hdmi_rich.screen import RichScreen
 
@@ -50,6 +51,9 @@ class RichDisplay:
             RichIdleScene(self.cfg, fonts),
             RichFlightScene(overhead, self.cfg, fonts),
         ]
+        if getattr(self.cfg, "satellite_tracking_enabled", False):
+            tle_mgr = self._start_tle_manager()
+            scenes.append(RichSatelliteScene(self.cfg, fonts, tle_mgr))
         manager = RichSceneManager(scenes)
 
         stop_flag = threading.Event()
@@ -171,6 +175,15 @@ class RichDisplay:
         from utilities.overhead_fr24 import Overhead
 
         return Overhead(), 30
+
+    def _start_tle_manager(self):
+        """Instantiate and start the shared TLEManager so pass computation
+        can pick up TLE data as soon as the first fetch lands."""
+        from utilities.tle_manager import TLEManager
+
+        mgr = TLEManager()
+        mgr.start()
+        return mgr
 
     def _refresh_loop(self, overhead, interval: int, stop_flag: threading.Event) -> None:
         while not stop_flag.is_set():
