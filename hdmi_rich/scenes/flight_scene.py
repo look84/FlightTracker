@@ -36,14 +36,18 @@ CARD_RIGHT = s(1000)
 RADAR_LEFT = s(1040)
 RADAR_RIGHT = s(1888)
 
-# Full-width contacts strip along the bottom.  6 rows of tiny-font data
-# with a matching header row and modest padding fit in ~300 logical.
+# Full-width contacts strip along the bottom - split into 2 columns of 3
+# rows for a total of 6 visible flights.  The two columns share the same
+# block chrome; a vertical divider separates them.
 CONTACTS_LEFT = s(32)
 CONTACTS_RIGHT = s(1888)
-CONTACTS_HEIGHT = s(300)
+CONTACTS_HEIGHT = s(240)
 CONTACTS_TOP = CONTENT_BOT - CONTACTS_HEIGHT
-CONTACTS_ROW_H = s(40)
-CONTACTS_MAX_ROWS = 6
+CONTACTS_ROW_H = s(44)
+CONTACTS_COLUMNS = 2
+CONTACTS_ROWS_PER_COL = 3
+CONTACTS_MAX_ROWS = CONTACTS_COLUMNS * CONTACTS_ROWS_PER_COL  # 6
+CONTACTS_COL_GAP = s(40)
 
 # Main content (data card + radar) ends above the contacts panel.
 MAIN_BOT = CONTACTS_TOP - s(20)
@@ -115,12 +119,18 @@ class RichFlightScene(RichScene):
             f"{int(self.cfg.flight_radius)} KM",
         )
 
-        # Contacts block chrome + column headers
+        # Contacts block chrome, vertical divider between the two columns,
+        # and column headers rendered in both columns.
         contacts_rect = self._contacts_rect()
         inner = block.chrome(bg, self.fonts, contacts_rect, "CONTACTS")
-        for label, x in self._contacts_column_positions(inner):
-            hdr = self.fonts.tiny.render(label, True, theme.FAINT)
-            bg.blit(hdr, (x, inner.y))
+        col_a, col_b = self._contacts_col_rects(inner)
+        div_x = (col_a.right + col_b.x) // 2
+        pygame.draw.line(bg, theme.DIM, (div_x, inner.y + s(8)),
+                         (div_x, inner.bottom - s(8)), 1)
+        for col_rect in (col_a, col_b):
+            for label, x in self._contacts_column_layout(col_rect):
+                hdr = self.fonts.tiny.render(label, True, theme.FAINT)
+                bg.blit(hdr, (x, col_rect.y))
 
         # Aircraft separator line
         sep_y = CONTENT_TOP + s(260)
@@ -204,7 +214,7 @@ class RichFlightScene(RichScene):
 
     def _draw_telemetry(self, surface, flight) -> None:
         y = CONTENT_TOP + s(400)
-        row_h = s(120)
+        row_h = s(100)
         col_w = (CARD_RIGHT - CARD_LEFT) // 3
 
         dist_km = self._distance_km(flight)
@@ -269,14 +279,23 @@ class RichFlightScene(RichScene):
             CONTACTS_HEIGHT,
         )
 
-    def _contacts_column_positions(self, inner):
-        # Full-width strip: spread columns across the inner area.
-        w = inner.width
+    def _contacts_col_rects(self, inner):
+        """Return the two per-column sub-rects inside the contacts inner area."""
+        col_w = (inner.width - CONTACTS_COL_GAP) // 2
+        left = pygame.Rect(inner.x, inner.y, col_w, inner.height)
+        right = pygame.Rect(
+            inner.x + col_w + CONTACTS_COL_GAP, inner.y, col_w, inner.height
+        )
+        return left, right
+
+    def _contacts_column_layout(self, col_rect):
+        """Header/data column positions within a single contacts column."""
+        w = col_rect.width
         return [
-            ("CALLSIGN", inner.x + s(60)),
-            ("HDG", inner.x + int(w * 0.35)),
-            ("ALT", inner.x + int(w * 0.55)),
-            ("SPD", inner.x + int(w * 0.75)),
+            ("CALLSIGN", col_rect.x + s(40)),
+            ("HDG", col_rect.x + int(w * 0.45)),
+            ("ALT", col_rect.x + int(w * 0.65)),
+            ("SPD", col_rect.right - s(60)),
         ]
 
     def _draw_contacts_dynamic(self, surface, flights, current_index: int) -> None:
@@ -294,31 +313,47 @@ class RichFlightScene(RichScene):
             )
             return
 
-        col_positions = self._contacts_column_positions(inner)
-        col_x = {
-            "chev": inner.x,
-            "callsign": col_positions[0][1],
-            "hdg": col_positions[1][1],
-            "alt": col_positions[2][1],
-            "spd": col_positions[3][1],
-        }
-
-        row_h = CONTACTS_ROW_H
-        # Show up to CONTACTS_MAX_ROWS at once; window the visible slice
-        # around current_index so the featured flight is always on screen.
-        max_rows = min(
-            CONTACTS_MAX_ROWS, max(1, (inner.height - s(48)) // row_h)
-        )
-        if current_index < max_rows:
+        # Window the visible slice so the currently-featured flight is
+        # always on screen when we cycle past the first CONTACTS_MAX_ROWS.
+        if current_index < CONTACTS_MAX_ROWS:
             window_start = 0
         else:
-            window_start = current_index - max_rows + 1
-        window_start = min(window_start, max(0, len(flights) - max_rows))
-        visible = flights[window_start : window_start + max_rows]
-        for i, f in enumerate(visible):
-            actual_index = window_start + i
-            y = inner.y + s(40) + i * row_h
-            is_current = actual_index == current_index
+            window_start = current_index - CONTACTS_MAX_ROWS + 1
+        window_start = min(
+            window_start, max(0, len(flights) - CONTACTS_MAX_ROWS)
+        )
+
+        col_a, col_b = self._contacts_col_rects(inner)
+        for col_index, col_rect in enumerate((col_a, col_b)):
+            base_idx = window_start + col_index * CONTACTS_ROWS_PER_COL
+            self._draw_contacts_column(
+                surface, col_rect, flights, base_idx, current_index
+            )
+
+    def _draw_contacts_column(
+        self,
+        surface,
+        col_rect,
+        flights,
+        base_idx: int,
+        current_index: int,
+    ) -> None:
+        row_h = CONTACTS_ROW_H
+        cols = self._contacts_column_layout(col_rect)
+        col_x = {
+            "chev": col_rect.x - s(6),
+            "callsign": cols[0][1],
+            "hdg": cols[1][1],
+            "alt": cols[2][1],
+            "spd": cols[3][1],
+        }
+        for i in range(CONTACTS_ROWS_PER_COL):
+            idx = base_idx + i
+            if idx >= len(flights):
+                break
+            f = flights[idx]
+            y = col_rect.y + s(40) + i * row_h
+            is_current = idx == current_index
             colour = theme.PRIMARY if is_current else theme.ACCENT
             if is_current:
                 chev = self.fonts.tiny.render(">", True, theme.PRIMARY)
@@ -329,8 +364,12 @@ class RichFlightScene(RichScene):
             hdg = self.fonts.tiny.render(
                 f"{int(f.heading or 0) % 360:03d}", True, colour
             )
-            alt = self.fonts.tiny.render(self._fmt_altitude(f.altitude), True, colour)
-            spd = self.fonts.tiny.render(self._fmt_speed(f.ground_speed), True, colour)
+            alt = self.fonts.tiny.render(
+                self._fmt_altitude(f.altitude), True, colour
+            )
+            spd = self.fonts.tiny.render(
+                self._fmt_speed(f.ground_speed), True, colour
+            )
             surface.blit(call, (col_x["callsign"], y))
             surface.blit(hdg, (col_x["hdg"], y))
             surface.blit(alt, (col_x["alt"], y))
