@@ -94,7 +94,7 @@ class RichFlightScene(RichScene):
             self._draw_aircraft(screen.surface, primary)
             self._draw_telemetry(screen.surface, primary)
 
-        self._draw_radar_dynamic(screen.surface, flights, t)
+        self._draw_radar_dynamic(screen.surface, flights, t, primary_index)
         self._draw_contacts_dynamic(screen.surface, flights, primary_index)
 
         n_contacts = len(flights)
@@ -289,7 +289,9 @@ class RichFlightScene(RichScene):
         outer_r = min(radar_w, radar_h) // 2 - s(40)
         return cx, cy, outer_r
 
-    def _draw_radar_dynamic(self, surface, flights, t: float) -> None:
+    def _draw_radar_dynamic(
+        self, surface, flights, t: float, current_index: int
+    ) -> None:
         cx, cy, outer_r = self._radar_geometry()
         radius_km = max(1.0, float(self.cfg.flight_radius))
         contacts = []
@@ -306,7 +308,8 @@ class RichFlightScene(RichScene):
                 range_norm = min(1.0, dist_km / radius_km)
             contacts.append((bearing, range_norm, f.callsign))
         radar.draw_animation(
-            surface, self.fonts, cx, cy, outer_r, contacts, t
+            surface, self.fonts, cx, cy, outer_r, contacts, t,
+            current_index=current_index,
         )
 
     # -- contacts panel (dynamic) ---------------------------------------

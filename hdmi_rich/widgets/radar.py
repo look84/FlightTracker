@@ -63,17 +63,31 @@ def draw_animation(
     radius: int,
     contacts: list[tuple[float, float, str]],
     t: float,
+    current_index: int = -1,
 ) -> None:
-    """Dynamic radar bits: sweep wedge + contact blips."""
+    """Dynamic radar bits: sweep wedge + contact blips.
+
+    ``current_index`` is the index into *contacts* of the flight
+    currently featured in the main data card; that blip renders with
+    an amber "target ring" so the operator can see at a glance which
+    dot on the plot maps to the callsign in the header.
+    """
     sweep_angle_deg = (t / SWEEP_PERIOD_S) * 360 % 360
     _draw_sweep_wedge(surface, cx, cy, radius, sweep_angle_deg)
 
-    for bearing_deg, range_norm, _label in contacts:
+    for i, (bearing_deg, range_norm, _label) in enumerate(contacts):
         rng = max(0.0, min(1.0, range_norm)) * radius
         ang = math.radians(bearing_deg - 90)
         bx = cx + math.cos(ang) * rng
         by = cy + math.sin(ang) * rng
-        _draw_blip(surface, bx, by, sweep_angle_deg, bearing_deg)
+        _draw_blip(
+            surface,
+            bx,
+            by,
+            sweep_angle_deg,
+            bearing_deg,
+            is_current=(i == current_index),
+        )
 
 
 def draw(
@@ -113,10 +127,26 @@ def _draw_sweep_wedge(surface, cx: int, cy: int, radius: int, angle_deg: float) 
     pygame.draw.line(surface, theme.PRIMARY, (cx, cy), (x2, y2), 2)
 
 
-def _draw_blip(surface, bx: float, by: float, sweep_deg: float, bearing_deg: float) -> None:
+def _draw_blip(
+    surface,
+    bx: float,
+    by: float,
+    sweep_deg: float,
+    bearing_deg: float,
+    is_current: bool = False,
+) -> None:
     delta = (sweep_deg - bearing_deg) % 360
     freshness = 1.0 - min(1.0, delta / (SWEEP_PERIOD_S * 360 / SWEEP_PERIOD_S / 4))
-    pygame.draw.circle(surface, theme.PRIMARY, (int(bx), int(by)), max(2, s(4)))
+    ix, iy = int(bx), int(by)
+
+    if is_current:
+        # Larger bright dot + an amber target ring so the featured flight
+        # stands out from other contacts on the plot.
+        pygame.draw.circle(surface, theme.PRIMARY, (ix, iy), max(3, s(7)))
+        pygame.draw.circle(surface, theme.ACCENT, (ix, iy), max(6, s(14)), 2)
+    else:
+        pygame.draw.circle(surface, theme.PRIMARY, (ix, iy), max(2, s(4)))
+
     if freshness > 0.0:
         r = int(s(6) + s(12) * freshness)
         c = (
@@ -124,4 +154,4 @@ def _draw_blip(surface, bx: float, by: float, sweep_deg: float, bearing_deg: flo
             int(theme.PRIMARY[1] * freshness),
             int(theme.PRIMARY[2] * freshness),
         )
-        pygame.draw.circle(surface, c, (int(bx), int(by)), r, 1)
+        pygame.draw.circle(surface, c, (ix, iy), r, 1)
