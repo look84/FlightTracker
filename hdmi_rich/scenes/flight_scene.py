@@ -132,8 +132,9 @@ class RichFlightScene(RichScene):
                 hdr = self.fonts.tiny.render(label, True, theme.FAINT)
                 bg.blit(hdr, (x, col_rect.y))
 
-        # Aircraft separator line
-        sep_y = CONTENT_TOP + s(240)
+        # Aircraft separator line - shifted down so the FLT <callsign>
+        # sub-line in the route section clears it.
+        sep_y = CONTENT_TOP + s(280)
         pygame.draw.line(
             bg, theme.DIM, (CARD_LEFT, sep_y), (CARD_RIGHT, sep_y), 1
         )
@@ -241,14 +242,15 @@ class RichFlightScene(RichScene):
 
     def _draw_aircraft(self, surface, flight) -> None:
         # Separator line above the title is part of static chrome now.
-        y = CONTENT_TOP + s(240)
+        # Sits under the FLT <callsign> sub-line of the route section.
+        y = CONTENT_TOP + s(280)
         plane = flight.plane or "UNKNOWN TYPE"
         reg = flight.registration or ""
         title = plane.upper()
         if reg:
             title = f"{title}   |   REG {reg.upper()}"
         title_surf = self.fonts.large.render(title, True, theme.ACCENT)
-        surface.blit(title_surf, (CARD_LEFT, y + s(16)))
+        surface.blit(title_surf, (CARD_LEFT, y + s(8)))
 
     def _draw_telemetry(self, surface, flight) -> None:
         y = CONTENT_TOP + s(380)
