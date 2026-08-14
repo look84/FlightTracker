@@ -144,7 +144,7 @@ class RichFlightScene(RichScene):
 
     def _draw_aircraft(self, surface, flight) -> None:
         y = CONTENT_TOP + 260
-        rect = pygame.Rect(CARD_LEFT, y, CARD_RIGHT - CARD_LEFT, 90)
+        rect = pygame.Rect(CARD_LEFT, y, CARD_RIGHT - CARD_LEFT, 110)
         pygame.draw.line(
             surface, theme.DIM, (rect.left, rect.top), (rect.right, rect.top), 1
         )
@@ -153,11 +153,11 @@ class RichFlightScene(RichScene):
         title = plane.upper()
         if reg:
             title = f"{title}   |   REG {reg.upper()}"
-        title_surf = self.fonts.medium.render(title, True, theme.ACCENT)
+        title_surf = self.fonts.at(80).render(title, True, theme.ACCENT)
         surface.blit(title_surf, (rect.left, rect.top + 16))
 
     def _draw_telemetry(self, surface, flight) -> None:
-        y = CONTENT_TOP + 380
+        y = CONTENT_TOP + 400
         row_h = 130
         col_w = (CARD_RIGHT - CARD_LEFT) // 3
 
