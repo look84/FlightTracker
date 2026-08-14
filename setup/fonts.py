@@ -2,8 +2,25 @@ import os
 
 # Fonts are loaded lazily on first access so the panel driver can be
 # selected at runtime (Pi 3/4 rgbmatrix vs Pi 5 piomatter).
+#
+# In rich HDMI mode there is no RGBPanel, so ``get_panel()`` raises.  Rich
+# mode never actually renders classic LED scenes, so we short-circuit and
+# hand out ``None`` for every font tier - any code path that later tries
+# to *use* one will fail loudly, but pure imports (e.g. importing
+# WeatherService from ``scenes/idle/themes/theme_utilities``) succeed.
 
 DIR_PATH = os.path.dirname(os.path.realpath(__file__))
+
+_FONT_NAMES = (
+    "extrasmall",
+    "small",
+    "small_symbols",
+    "regular",
+    "medium",
+    "medium_bold",
+    "large",
+    "large_bold",
+)
 
 _loaded_fonts = {}
 
@@ -11,7 +28,15 @@ _loaded_fonts = {}
 def _load_fonts():
     if _loaded_fonts:
         return
-    from display.panel_factory import get_panel
+    from display.panel_factory import get_panel, is_rich_mode
+
+    if is_rich_mode():
+        # No LED panel in rich HDMI mode; hand out None placeholders so
+        # module-level ``fonts.small`` references in LED-only modules stop
+        # blowing up import chains.
+        for name in _FONT_NAMES:
+            _loaded_fonts[name] = None
+        return
 
     panel = get_panel()
 
@@ -30,16 +55,7 @@ def _load_fonts():
 
 
 def __getattr__(name):
-    if name in (
-        "extrasmall",
-        "small",
-        "small_symbols",
-        "regular",
-        "medium",
-        "medium_bold",
-        "large",
-        "large_bold",
-    ):
+    if name in _FONT_NAMES:
         _load_fonts()
         return _loaded_fonts[name]
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
