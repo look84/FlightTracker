@@ -34,7 +34,12 @@ def draw(surface, fonts, title: str, callsign: str | None = None) -> None:
     pygame.draw.rect(surface, chrome_colour, pygame.Rect(0, 0, w, HEIGHT), 2)
 
     if is_active:
-        # Callsign only, centred, flashing.
+        # Left-justified "CALLSIGN" label (amber, solid).
+        label_surf = fonts.medium.render("CALLSIGN", True, theme.ACCENT)
+        surface.blit(
+            label_surf, (_PAD_X, HEIGHT // 2 - label_surf.get_height() // 2)
+        )
+        # Centred callsign value, flashing at 1 Hz.
         if (time.monotonic() % 1.0) < 0.7:
             cs_surf = fonts.large.render(callsign.upper(), True, theme.PRIMARY)
             surface.blit(
