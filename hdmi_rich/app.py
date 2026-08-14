@@ -22,7 +22,7 @@ from hdmi_rich.scenes.satellite_scene import RichSatelliteScene
 from hdmi_rich.scenes.scene_base import RichSceneManager
 from hdmi_rich.screen import RichScreen
 
-TARGET_FPS = 30
+TARGET_FPS = 20
 BOOT_MIN_SECONDS = 6      # min time to show the loading scene, so users can scan the QR
 BOOT_MAX_SECONDS = 20     # cap in case connectivity checks stall
 
