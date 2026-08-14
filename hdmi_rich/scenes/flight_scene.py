@@ -333,9 +333,10 @@ class RichFlightScene(RichScene):
         w = col_rect.width
         return [
             ("CALLSIGN", col_rect.x + s(40)),
-            ("HDG", col_rect.x + int(w * 0.45)),
-            ("ALT", col_rect.x + int(w * 0.65)),
-            ("SPD", col_rect.right - s(60)),
+            ("HDG", col_rect.x + int(w * 0.36)),
+            ("ALT", col_rect.x + int(w * 0.52)),
+            ("SPD", col_rect.x + int(w * 0.72)),
+            ("DIST", col_rect.right - s(60)),
         ]
 
     def _draw_contacts_dynamic(self, surface, flights, current_index: int) -> None:
@@ -386,6 +387,7 @@ class RichFlightScene(RichScene):
             "hdg": cols[1][1],
             "alt": cols[2][1],
             "spd": cols[3][1],
+            "dist": cols[4][1],
         }
         for i in range(CONTACTS_ROWS_PER_COL):
             idx = base_idx + i
@@ -410,10 +412,14 @@ class RichFlightScene(RichScene):
             spd = self.fonts.small.render(
                 self._fmt_speed(f.ground_speed), True, colour
             )
+            dist = self.fonts.small.render(
+                self._fmt_distance(self._distance_km(f)), True, colour
+            )
             surface.blit(call, (col_x["callsign"], y))
             surface.blit(hdg, (col_x["hdg"], y))
             surface.blit(alt, (col_x["alt"], y))
             surface.blit(spd, (col_x["spd"], y))
+            surface.blit(dist, (col_x["dist"], y))
 
     # -- geo helpers ----------------------------------------------------
 
