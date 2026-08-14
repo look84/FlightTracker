@@ -88,12 +88,26 @@ class RichScreen:
     def present(self) -> None:
         import pygame
 
-        self._real.fill((0, 0, 0))
-        pygame.transform.scale(
-            self.surface,
-            (self._dest_rect.width, self._dest_rect.height),
-            self._real.subsurface(self._dest_rect),
-        )
+        # Fast path: virtual surface already matches the destination rect.
+        # Skip pygame.transform.scale (a full CPU copy even at 1:1) and blit
+        # direct.  Common case on a 1920x1080 HDMI Pi where virtual = real.
+        real_w, real_h = self._real.get_size()
+        if (
+            self._dest_rect.width == VIRTUAL_W
+            and self._dest_rect.height == VIRTUAL_H
+            and self._dest_rect.x == 0
+            and self._dest_rect.y == 0
+            and real_w == VIRTUAL_W
+            and real_h == VIRTUAL_H
+        ):
+            self._real.blit(self.surface, (0, 0))
+        else:
+            self._real.fill((0, 0, 0))
+            pygame.transform.scale(
+                self.surface,
+                (self._dest_rect.width, self._dest_rect.height),
+                self._real.subsurface(self._dest_rect),
+            )
         pygame.display.flip()
 
     def shutdown(self) -> None:
