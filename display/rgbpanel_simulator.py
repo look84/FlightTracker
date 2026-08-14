@@ -18,7 +18,10 @@ from datetime import datetime
 
 from display.bdf_font import BDFFont
 from display.bdf_font import draw_text as bdf_draw_text
+from display.pixel_canvas import PixelCanvas, draw_circle, draw_line, draw_square
 from display.rgbpanel import Colour, RGBPanel
+
+SimulatorCanvas = PixelCanvas
 
 # ---------------------------------------------------------------------------
 # Display constants
@@ -36,96 +39,6 @@ BRIGHTNESS = 1.0  # global brightness boost multiplier (1.0 = no boost)
 _CAPTURE_DIR = os.path.join(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "captures"
 )
-
-
-# ---------------------------------------------------------------------------
-# Canvas - flat pixel buffer matching the LED grid
-# ---------------------------------------------------------------------------
-
-
-class SimulatorCanvas:
-    """In-memory pixel buffer matching the LED grid."""
-
-    __slots__ = ("cols", "rows", "buf")
-
-    def __init__(self, cols: int, rows: int):
-        self.cols = cols
-        self.rows = rows
-        # Flat list: index = y * cols + x, value = (r, g, b)
-        self.buf: list[tuple[int, int, int]] = [(0, 0, 0)] * (cols * rows)
-
-    def set_pixel(self, x: int, y: int, r: int, g: int, b: int) -> None:
-        if 0 <= x < self.cols and 0 <= y < self.rows:
-            self.buf[y * self.cols + x] = (
-                max(0, min(255, int(r))),
-                max(0, min(255, int(g))),
-                max(0, min(255, int(b))),
-            )
-
-    def clear(self) -> None:
-        self.buf = [(0, 0, 0)] * (self.cols * self.rows)
-
-    def fill(self, r: int, g: int, b: int) -> None:
-        self.buf = [(r, g, b)] * (self.cols * self.rows)
-
-
-# ---------------------------------------------------------------------------
-# Drawing helpers (operate on SimulatorCanvas)
-# ---------------------------------------------------------------------------
-
-
-def _draw_line(canvas, x0: int, y0: int, x1: int, y1: int, colour) -> None:
-    r, g, b = colour.red, colour.green, colour.blue
-    dx = abs(x1 - x0)
-    dy = abs(y1 - y0)
-    sx = 1 if x0 < x1 else -1
-    sy = 1 if y0 < y1 else -1
-    err = dx - dy
-
-    while True:
-        canvas.set_pixel(x0, y0, r, g, b)
-        if x0 == x1 and y0 == y1:
-            break
-        e2 = 2 * err
-        if e2 > -dy:
-            err -= dy
-            x0 += sx
-        if e2 < dx:
-            err += dx
-            y0 += sy
-
-
-def _draw_circle(canvas, cx: int, cy: int, radius: int, colour) -> None:
-    r, g, b = colour.red, colour.green, colour.blue
-
-    def _plot8(dx, dy):
-        canvas.set_pixel(cx + dx, cy + dy, r, g, b)
-        canvas.set_pixel(cx - dx, cy + dy, r, g, b)
-        canvas.set_pixel(cx + dx, cy - dy, r, g, b)
-        canvas.set_pixel(cx - dx, cy - dy, r, g, b)
-        canvas.set_pixel(cx + dy, cy + dx, r, g, b)
-        canvas.set_pixel(cx - dy, cy + dx, r, g, b)
-        canvas.set_pixel(cx + dy, cy - dx, r, g, b)
-        canvas.set_pixel(cx - dy, cy - dx, r, g, b)
-
-    x, y = 0, radius
-    d = 3 - 2 * radius
-    while x <= y:
-        _plot8(x, y)
-        if d < 0:
-            d += 4 * x + 6
-        else:
-            d += 4 * (x - y) + 10
-            y -= 1
-        x += 1
-
-
-def _draw_square(canvas, x0: int, y0: int, x1: int, y1: int, colour) -> None:
-    r, g, b = colour.red, colour.green, colour.blue
-    left, right = (x0, x1) if x0 <= x1 else (x1, x0)
-    top, bottom = (y0, y1) if y0 <= y1 else (y1, y0)
-    for x in range(left, right):
-        _draw_line(canvas, x, top, x, bottom, Colour(r, g, b))
 
 
 # ---------------------------------------------------------------------------
@@ -184,10 +97,10 @@ class SimulatorPanel(RGBPanel):
         return bdf_draw_text(canvas, font, x, y, colour, text)
 
     def draw_line(self, canvas, x0, y0, x1, y1, colour):
-        _draw_line(canvas, x0, y0, x1, y1, colour)
+        draw_line(canvas, x0, y0, x1, y1, colour)
 
     def draw_circle(self, canvas, cx, cy, radius, colour):
-        _draw_circle(canvas, cx, cy, radius, colour)
+        draw_circle(canvas, cx, cy, radius, colour)
 
     def set_pixel(self, canvas, x, y, r, g, b):
         canvas.set_pixel(x, y, r, g, b)
@@ -206,7 +119,7 @@ class SimulatorPanel(RGBPanel):
         self._brightness = max(0, min(100, percent))
 
     def draw_square(self, canvas, x0, y0, x1, y1, colour):
-        _draw_square(canvas, x0, y0, x1, y1, colour)
+        draw_square(canvas, x0, y0, x1, y1, colour)
 
     def draw_image(self, canvas, x, y, image):
         """Draw a PIL Image at (x, y), skipping transparent pixels."""

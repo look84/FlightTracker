@@ -14,6 +14,7 @@ mdurl>=0.1.2
 numpy>=2.0.0
 pillow>=10.0.0
 pycparser>=3.0
+pygame>=2.5.0
 Pygments>=2.20.0
 qrcode[pil]>=7.4.2
 requests>=2.32.0

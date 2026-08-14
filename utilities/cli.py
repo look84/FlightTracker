@@ -420,6 +420,7 @@ def _print_usage() -> None:
     print()
     print("Options (can be combined with any command):")
     print("  --disable-tests        Skip start-up connectivity tests")
+    print("  --panel <name>         Force panel driver: 'hdmi' (fullscreen), 'hdmi-window' (dev)")
     print()
     print("Test commands accept --parameters and --interval/--limit for repeated runs.")
     print("Run 'python flight-tracker.py test <target> --help' for details.")

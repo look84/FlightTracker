@@ -5,6 +5,27 @@ import sys
 import threading
 import time
 
+
+def _extract_panel_flag(argv: list[str]) -> None:
+    """Pull ``--panel <name>`` out of argv and stash it in the environment.
+
+    Must run before ``display.panel_factory`` is imported so the factory's
+    HDMI opt-in branch sees the value.  Accepts ``--panel hdmi`` or
+    ``--panel=hdmi``.
+    """
+    for i, arg in enumerate(argv):
+        if arg == "--panel" and i + 1 < len(argv):
+            os.environ["FLIGHTTRACKER_PANEL"] = argv[i + 1]
+            del argv[i : i + 2]
+            return
+        if arg.startswith("--panel="):
+            os.environ["FLIGHTTRACKER_PANEL"] = arg.split("=", 1)[1]
+            del argv[i]
+            return
+
+
+_extract_panel_flag(sys.argv)
+
 from PIL import Image
 
 # -- Phase 1: Minimal imports for the splash screen -----------------------

@@ -119,6 +119,41 @@ sudo systemctl restart FlightTracker.service
 
 ---
 
+## HDMI LCD (kiosk mode)
+
+FlightTracker can render its 64x32 canvas to an HDMI-attached LCD instead of a physical LED matrix. The image is scaled up with crisp nearest-neighbour and centred on a black background - a "contain" fit that never clips.
+
+Run it manually with:
+
+```bash
+FLIGHTTRACKER_PANEL=hdmi env/bin/python3 flight-tracker.py
+# or:
+env/bin/python3 flight-tracker.py --panel hdmi
+```
+
+On a headless Pi (booted into a tty, no X/Wayland session), the driver auto-selects SDL's `kmsdrm` video backend so pygame writes straight to the framebuffer. If you're running from a desktop session, the default X/Wayland driver is used instead.
+
+Keys while running: `P` saves a screenshot to `captures/`, `Q` or `Esc` quits.
+
+For desktop development you can open a resizable window instead of taking over the display:
+
+```bash
+./flight-tracker.py --panel hdmi-window
+```
+
+To run on boot, edit the systemd unit and add the environment variable:
+
+```ini
+[Service]
+Environment=FLIGHTTRACKER_PANEL=hdmi
+# Optional - only needed if the auto-detect picks the wrong backend:
+# Environment=SDL_VIDEODRIVER=kmsdrm
+```
+
+Then `sudo systemctl daemon-reload && sudo systemctl restart FlightTracker.service`.
+
+---
+
 ## Using a local ADS-B receiver (tar1090)
 
 See the [main README](../../README.md) for tar1090 setup instructions - this is platform-independent.

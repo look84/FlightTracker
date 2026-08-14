@@ -6,9 +6,13 @@ to the rgbmatrix (Pi 3/4) driver. The selected panel is cached as a singleton.
 
 On desktop machines where neither hardware driver is available, the pygame
 simulator is used as a final fallback so the app always runs.
+
+Setting ``FLIGHTTRACKER_PANEL=hdmi`` opts in to the HDMI LCD driver instead,
+bypassing the auto-detected LED matrix drivers.
 """
 
 import importlib
+import os
 
 _panel = None
 
@@ -17,6 +21,15 @@ def get_panel():
     """Return the singleton RGBPanel instance, creating it if needed."""
     global _panel
     if _panel is not None:
+        return _panel
+
+    # Explicit HDMI opt-in - bypass the LED matrix drivers entirely.
+    # 'hdmi'        -> fullscreen (kiosk / real HDMI monitor)
+    # 'hdmi-window' -> resizable window (desktop dev)
+    panel_type = os.environ.get("FLIGHTTRACKER_PANEL", "").lower()
+    if panel_type in ("hdmi", "hdmi-window"):
+        mod = importlib.import_module("display.rgbpanel_hdmi")
+        _panel = mod.HDMIPanel(fullscreen=(panel_type == "hdmi"))
         return _panel
 
     # Try Pi 5 driver first
