@@ -34,8 +34,20 @@ CARD_LEFT = s(32)
 CARD_RIGHT = s(1000)
 RADAR_LEFT = s(1040)
 RADAR_RIGHT = s(1888)
-RADAR_BOT = CONTENT_TOP + s(600)
-CONTACTS_TOP = RADAR_BOT + s(24)
+
+# Full-width contacts strip along the bottom.  6 rows of tiny-font data
+# with a matching header row and modest padding fit in ~300 logical.
+CONTACTS_LEFT = s(32)
+CONTACTS_RIGHT = s(1888)
+CONTACTS_HEIGHT = s(300)
+CONTACTS_TOP = CONTENT_BOT - CONTACTS_HEIGHT
+CONTACTS_ROW_H = s(40)
+CONTACTS_MAX_ROWS = 6
+
+# Main content (data card + radar) ends above the contacts panel.
+MAIN_BOT = CONTACTS_TOP - s(20)
+RADAR_BOT = MAIN_BOT
+
 CYCLE_SECONDS = 5.0
 
 
@@ -191,7 +203,7 @@ class RichFlightScene(RichScene):
 
     def _draw_telemetry(self, surface, flight) -> None:
         y = CONTENT_TOP + s(400)
-        row_h = s(130)
+        row_h = s(120)
         col_w = (CARD_RIGHT - CARD_LEFT) // 3
 
         rows = [
@@ -239,18 +251,20 @@ class RichFlightScene(RichScene):
 
     def _contacts_rect(self) -> pygame.Rect:
         return pygame.Rect(
-            RADAR_LEFT,
+            CONTACTS_LEFT,
             CONTACTS_TOP,
-            RADAR_RIGHT - RADAR_LEFT,
-            CONTENT_BOT - CONTACTS_TOP,
+            CONTACTS_RIGHT - CONTACTS_LEFT,
+            CONTACTS_HEIGHT,
         )
 
     def _contacts_column_positions(self, inner):
+        # Full-width strip: spread columns across the inner area.
+        w = inner.width
         return [
-            ("CALLSIGN", inner.x + s(40)),
-            ("HDG", inner.x + s(340)),
-            ("ALT", inner.x + s(480)),
-            ("SPD", inner.right - s(140)),
+            ("CALLSIGN", inner.x + s(60)),
+            ("HDG", inner.x + int(w * 0.35)),
+            ("ALT", inner.x + int(w * 0.55)),
+            ("SPD", inner.x + int(w * 0.75)),
         ]
 
     def _draw_contacts_dynamic(self, surface, flights, current_index: int) -> None:
@@ -277,10 +291,12 @@ class RichFlightScene(RichScene):
             "spd": col_positions[3][1],
         }
 
-        row_h = s(62)
-        max_rows = max(1, (inner.height - s(48)) // row_h)
-        # Window the visible slice so the currently-featured flight is
-        # always on screen when we cycle past the first max_rows contacts.
+        row_h = CONTACTS_ROW_H
+        # Show up to CONTACTS_MAX_ROWS at once; window the visible slice
+        # around current_index so the featured flight is always on screen.
+        max_rows = min(
+            CONTACTS_MAX_ROWS, max(1, (inner.height - s(48)) // row_h)
+        )
         if current_index < max_rows:
             window_start = 0
         else:
@@ -289,20 +305,20 @@ class RichFlightScene(RichScene):
         visible = flights[window_start : window_start + max_rows]
         for i, f in enumerate(visible):
             actual_index = window_start + i
-            y = inner.y + s(44) + i * row_h
+            y = inner.y + s(40) + i * row_h
             is_current = actual_index == current_index
             colour = theme.PRIMARY if is_current else theme.ACCENT
             if is_current:
-                chev = self.fonts.small.render(">", True, theme.PRIMARY)
-                surface.blit(chev, (col_x["chev"], y - s(4)))
-            call = self.fonts.small.render(
+                chev = self.fonts.tiny.render(">", True, theme.PRIMARY)
+                surface.blit(chev, (col_x["chev"], y - s(2)))
+            call = self.fonts.tiny.render(
                 (f.callsign or "?").upper(), True, colour
             )
-            hdg = self.fonts.small.render(
+            hdg = self.fonts.tiny.render(
                 f"{int(f.heading or 0) % 360:03d}", True, colour
             )
-            alt = self.fonts.small.render(self._fmt_altitude(f.altitude), True, colour)
-            spd = self.fonts.small.render(self._fmt_speed(f.ground_speed), True, colour)
+            alt = self.fonts.tiny.render(self._fmt_altitude(f.altitude), True, colour)
+            spd = self.fonts.tiny.render(self._fmt_speed(f.ground_speed), True, colour)
             surface.blit(call, (col_x["callsign"], y))
             surface.blit(hdg, (col_x["hdg"], y))
             surface.blit(alt, (col_x["alt"], y))

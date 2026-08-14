@@ -12,7 +12,7 @@ import pygame
 from hdmi_rich import theme
 from hdmi_rich.screen import s
 
-HEIGHT = s(100)
+HEIGHT = s(60)
 _PAD_X = s(24)
 
 
