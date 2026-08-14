@@ -34,8 +34,9 @@ def draw(surface, fonts, title: str, callsign: str | None = None) -> None:
     pygame.draw.rect(surface, chrome_colour, pygame.Rect(0, 0, w, HEIGHT), 2)
 
     if is_active:
-        # Left-justified "CALLSIGN" label (amber, solid).
-        label_surf = fonts.medium.render("CALLSIGN", True, theme.ACCENT)
+        # Left-justified "ACTIVE" label (green, solid) - matches the
+        # green chrome + inverse-video callsign block that follows.
+        label_surf = fonts.medium.render("ACTIVE", True, theme.PRIMARY)
         surface.blit(
             label_surf, (_PAD_X, HEIGHT // 2 - label_surf.get_height() // 2)
         )

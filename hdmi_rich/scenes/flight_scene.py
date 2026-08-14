@@ -213,6 +213,24 @@ class RichFlightScene(RichScene):
             sub_surf = self.fonts.small.render(subline, True, theme.FAINT)
             sub_x = CARD_LEFT + ((CARD_RIGHT - CARD_LEFT) - sub_surf.get_width()) // 2
             surface.blit(sub_surf, (sub_x, y2))
+            y2 += sub_surf.get_height() + s(4)
+
+        # Flight number just under the route - a static reference next to
+        # the origin/destination.  Amber label + green value keeps it
+        # visually distinct from the airport codes above.
+        if flight.callsign:
+            cs_label_surf = self.fonts.small.render("FLT", True, theme.ACCENT)
+            cs_value_surf = self.fonts.small.render(
+                flight.callsign.upper(), True, theme.PRIMARY
+            )
+            gap_lv = s(12)
+            total_w = cs_label_surf.get_width() + gap_lv + cs_value_surf.get_width()
+            cs_x = CARD_LEFT + ((CARD_RIGHT - CARD_LEFT) - total_w) // 2
+            surface.blit(cs_label_surf, (cs_x, y2))
+            surface.blit(
+                cs_value_surf,
+                (cs_x + cs_label_surf.get_width() + gap_lv, y2),
+            )
 
     def _subline_for_route(self, flight) -> str:
         origin = flight.origin_municipality or flight.origin_name or ""
