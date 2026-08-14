@@ -10,21 +10,22 @@ from __future__ import annotations
 import pygame
 
 from hdmi_rich import theme
+from hdmi_rich.screen import s
 
-HEIGHT = 96
+HEIGHT = s(96)
+_PAD_X = s(24)
 
 
 def draw(surface, fonts, title: str, callsign: str | None = None) -> None:
     w = surface.get_width()
-    # 2px amber outline gives it the console-panel feel
     pygame.draw.rect(surface, theme.ACCENT, pygame.Rect(0, 0, w, HEIGHT), 2)
 
     title_surf = fonts.medium.render(title.upper(), True, theme.ACCENT)
-    surface.blit(title_surf, (24, HEIGHT // 2 - title_surf.get_height() // 2))
+    surface.blit(title_surf, (_PAD_X, HEIGHT // 2 - title_surf.get_height() // 2))
 
     if callsign:
         cs_surf = fonts.large.render(callsign.upper(), True, theme.PRIMARY)
         surface.blit(
             cs_surf,
-            (w - cs_surf.get_width() - 24, HEIGHT // 2 - cs_surf.get_height() // 2),
+            (w - cs_surf.get_width() - _PAD_X, HEIGHT // 2 - cs_surf.get_height() // 2),
         )

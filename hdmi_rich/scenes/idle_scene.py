@@ -21,6 +21,7 @@ import pygame
 from hdmi_rich import theme
 from hdmi_rich.chrome import SceneChrome
 from hdmi_rich.scenes.scene_base import RichScene
+from hdmi_rich.screen import VIRTUAL_H, VIRTUAL_W, s
 from hdmi_rich.widgets import block, header, ticker
 
 
@@ -52,11 +53,11 @@ class RichIdleScene(RichScene):
 
     def _quadrants(self):
         """Return the four (name, rect) quadrants; layout is fixed."""
-        top = header.HEIGHT + 24
-        bot = 1080 - ticker.HEIGHT - 24
-        gap = 16
-        pad = 24
-        w_avail = 1920 - pad * 2 - gap
+        top = header.HEIGHT + s(24)
+        bot = VIRTUAL_H - ticker.HEIGHT - s(24)
+        gap = s(16)
+        pad = s(24)
+        w_avail = VIRTUAL_W - pad * 2 - gap
         h_avail = bot - top - gap
         qw = w_avail // 2
         qh = h_avail // 2
@@ -87,7 +88,7 @@ class RichIdleScene(RichScene):
         ticker.draw(
             surface,
             self.fonts,
-            1080 - ticker.HEIGHT,
+            VIRTUAL_H - ticker.HEIGHT,
             "WAITING FOR OVERHEAD AIRCRAFT  |  PRESS Q/ESC TO QUIT",
         )
 
@@ -104,17 +105,17 @@ class RichIdleScene(RichScene):
         time_surf = big.render(time_str, True, theme.PRIMARY)
         surface.blit(
             time_surf,
-            (inner.centerx - time_surf.get_width() // 2, inner.y + 20),
+            (inner.centerx - time_surf.get_width() // 2, inner.y + s(20)),
         )
         date_surf = self.fonts.medium.render(date_str, True, theme.ACCENT)
         surface.blit(
             date_surf,
-            (inner.centerx - date_surf.get_width() // 2, inner.y + 220),
+            (inner.centerx - date_surf.get_width() // 2, inner.y + s(220)),
         )
         sub_surf = self.fonts.small.render(sub_str, True, theme.FAINT)
         surface.blit(
             sub_surf,
-            (inner.centerx - sub_surf.get_width() // 2, inner.y + 290),
+            (inner.centerx - sub_surf.get_width() // 2, inner.y + s(290)),
         )
 
     def _draw_conditions(self, surface, rect, weather):
@@ -131,11 +132,11 @@ class RichIdleScene(RichScene):
 
         big = self.fonts.xxlarge
         temp_surf = big.render(temp, True, theme.PRIMARY)
-        surface.blit(temp_surf, (inner.x, inner.y + 10))
+        surface.blit(temp_surf, (inner.x, inner.y + s(10)))
 
         if desc:
             desc_surf = self.fonts.medium.render(desc, True, theme.ACCENT)
-            surface.blit(desc_surf, (inner.x, inner.y + 220))
+            surface.blit(desc_surf, (inner.x, inner.y + s(220)))
 
         # Wind + humidity as a mini-table
         rows = [
@@ -145,14 +146,15 @@ class RichIdleScene(RichScene):
                 f"{int(wind_kph)} KM/H {wind_dir}" if wind_kph is not None else "--",
             ),
         ]
-        base_y = inner.y + 300
+        base_y = inner.y + s(300)
+        row_gap = s(60)
         for i, (label, value) in enumerate(rows):
             l_surf = self.fonts.small.render(label, True, theme.ACCENT)
             v_surf = self.fonts.small.render(value, True, theme.PRIMARY)
-            surface.blit(l_surf, (inner.x, base_y + i * 60))
+            surface.blit(l_surf, (inner.x, base_y + i * row_gap))
             surface.blit(
                 v_surf,
-                (inner.right - v_surf.get_width(), base_y + i * 60),
+                (inner.right - v_surf.get_width(), base_y + i * row_gap),
             )
 
     def _draw_forecast(self, surface, rect, weather):
@@ -176,17 +178,17 @@ class RichIdleScene(RichScene):
             day_surf = self.fonts.medium.render(label, True, theme.ACCENT)
             surface.blit(
                 day_surf,
-                (col_x + (col_w - day_surf.get_width()) // 2, inner.y + 20),
+                (col_x + (col_w - day_surf.get_width()) // 2, inner.y + s(20)),
             )
             hi_surf = self.fonts.large.render(hi, True, theme.PRIMARY)
             surface.blit(
                 hi_surf,
-                (col_x + (col_w - hi_surf.get_width()) // 2, inner.y + 90),
+                (col_x + (col_w - hi_surf.get_width()) // 2, inner.y + s(90)),
             )
             lo_surf = self.fonts.medium.render(lo, True, theme.FAINT)
             surface.blit(
                 lo_surf,
-                (col_x + (col_w - lo_surf.get_width()) // 2, inner.y + 190),
+                (col_x + (col_w - lo_surf.get_width()) // 2, inner.y + s(190)),
             )
             if rain is not None:
                 r_surf = self.fonts.small.render(
@@ -194,7 +196,7 @@ class RichIdleScene(RichScene):
                 )
                 surface.blit(
                     r_surf,
-                    (col_x + (col_w - r_surf.get_width()) // 2, inner.y + 260),
+                    (col_x + (col_w - r_surf.get_width()) // 2, inner.y + s(260)),
                 )
 
     def _draw_astro(self, surface, rect, weather):
@@ -228,9 +230,9 @@ class RichIdleScene(RichScene):
             ("MOON", (moon or "--").upper()),
             ("ILLUM", f"{illum}%" if illum is not None else "--"),
         ]
-        row_h = 60
+        row_h = s(60)
         for i, (label, value) in enumerate(rows):
-            y = inner.y + 20 + i * row_h
+            y = inner.y + s(20) + i * row_h
             l_surf = self.fonts.medium.render(label, True, theme.ACCENT)
             v_surf = self.fonts.medium.render(value, True, theme.PRIMARY)
             surface.blit(l_surf, (inner.x, y))

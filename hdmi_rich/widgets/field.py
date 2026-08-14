@@ -15,9 +15,10 @@ from __future__ import annotations
 import pygame
 
 from hdmi_rich import theme
+from hdmi_rich.screen import s
 
-LABEL_TO_VALUE_GAP = 4     # vertical gap between label row and value row
-VALUE_TO_UNIT_GAP = 12     # horizontal gap between value and unit
+LABEL_TO_VALUE_GAP = s(4)
+VALUE_TO_UNIT_GAP = s(12)
 
 
 def draw(
@@ -33,7 +34,7 @@ def draw(
 ) -> None:
     """Render a single stacked field row inside *rect*."""
     label_surf = fonts.tiny.render(label.upper(), True, label_colour)
-    surface.blit(label_surf, (rect.x, rect.y + 2))
+    surface.blit(label_surf, (rect.x, rect.y + s(2)))
 
     value_surf = fonts.medium.render(value.upper(), True, value_colour)
     value_y = rect.y + label_surf.get_height() + LABEL_TO_VALUE_GAP
@@ -45,5 +46,5 @@ def draw(
         # Baseline-align to the value's baseline (value bottom minus small
         # bit for the descender), so the unit reads as a suffix rather than
         # floating in the middle of the value.
-        unit_y = value_y + value_surf.get_height() - unit_surf.get_height() - 4
+        unit_y = value_y + value_surf.get_height() - unit_surf.get_height() - s(4)
         surface.blit(unit_surf, (unit_x, unit_y))

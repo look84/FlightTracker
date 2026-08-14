@@ -13,6 +13,7 @@ from __future__ import annotations
 import pygame
 
 from hdmi_rich import theme
+from hdmi_rich.screen import s
 
 
 def chrome(surface, fonts, rect: pygame.Rect, label: str) -> pygame.Rect:
@@ -20,19 +21,19 @@ def chrome(surface, fonts, rect: pygame.Rect, label: str) -> pygame.Rect:
     inner (padded) rect for convenience."""
     pygame.draw.rect(surface, theme.ACCENT, rect, 2)
     if label:
-        pad_x = 16
+        pad_x = s(16)
         label_surf = fonts.small.render(label.upper(), True, theme.ACCENT)
-        chip_w = label_surf.get_width() + 20
-        chip_h = label_surf.get_height() + 4
+        chip_w = label_surf.get_width() + s(20)
+        chip_h = label_surf.get_height() + s(4)
         chip = pygame.Rect(rect.x + pad_x, rect.y - chip_h // 2, chip_w, chip_h)
         pygame.draw.rect(surface, theme.BACKGROUND, chip)
-        surface.blit(label_surf, (chip.x + 10, chip.y + 2))
+        surface.blit(label_surf, (chip.x + s(10), chip.y + s(2)))
     return inner(rect)
 
 
 def inner(rect: pygame.Rect) -> pygame.Rect:
     """Return the padded content rect (no drawing)."""
-    return rect.inflate(-40, -40)
+    return rect.inflate(-s(40), -s(40))
 
 
 # Back-compat: single-call form still works for callers that don't

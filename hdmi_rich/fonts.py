@@ -61,9 +61,11 @@ class Fonts:
         import pygame
 
         pygame.font.init()
-        self.tiny = CachedFont(pygame.font.Font(FONT_PATH, 34))
-        self.small = CachedFont(pygame.font.Font(FONT_PATH, 54))
-        self.medium = CachedFont(pygame.font.Font(FONT_PATH, 62))
-        self.large = CachedFont(pygame.font.Font(FONT_PATH, 92))
-        self.xlarge = CachedFont(pygame.font.Font(FONT_PATH, 150))
-        self.xxlarge = CachedFont(pygame.font.Font(FONT_PATH, 220))
+        from hdmi_rich.screen import s
+
+        self.tiny = CachedFont(pygame.font.Font(FONT_PATH, s(34)))
+        self.small = CachedFont(pygame.font.Font(FONT_PATH, s(54)))
+        self.medium = CachedFont(pygame.font.Font(FONT_PATH, s(62)))
+        self.large = CachedFont(pygame.font.Font(FONT_PATH, s(92)))
+        self.xlarge = CachedFont(pygame.font.Font(FONT_PATH, s(150)))
+        self.xxlarge = CachedFont(pygame.font.Font(FONT_PATH, s(220)))

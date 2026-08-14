@@ -25,16 +25,17 @@ import pygame
 from hdmi_rich import theme
 from hdmi_rich.chrome import SceneChrome
 from hdmi_rich.scenes.scene_base import RichScene
+from hdmi_rich.screen import VIRTUAL_H, VIRTUAL_W, s
 from hdmi_rich.widgets import block, field, header, radar, ticker
 
-CONTENT_TOP = header.HEIGHT + 24
-CONTENT_BOT = 1080 - ticker.HEIGHT - 24
-CARD_LEFT = 32
-CARD_RIGHT = 1000
-RADAR_LEFT = 1040
-RADAR_RIGHT = 1888
-RADAR_BOT = CONTENT_TOP + 600
-CONTACTS_TOP = RADAR_BOT + 24
+CONTENT_TOP = header.HEIGHT + s(24)
+CONTENT_BOT = VIRTUAL_H - ticker.HEIGHT - s(24)
+CARD_LEFT = s(32)
+CARD_RIGHT = s(1000)
+RADAR_LEFT = s(1040)
+RADAR_RIGHT = s(1888)
+RADAR_BOT = CONTENT_TOP + s(600)
+CONTACTS_TOP = RADAR_BOT + s(24)
 CYCLE_SECONDS = 5.0
 
 
@@ -85,7 +86,7 @@ class RichFlightScene(RichScene):
             f"{n_contacts} contact{'s' if n_contacts != 1 else ''} in range "
             f"|  source: {source}  |  press Q/ESC to quit"
         )
-        ticker.draw(screen.surface, self.fonts, 1080 - ticker.HEIGHT, message)
+        ticker.draw(screen.surface, self.fonts, VIRTUAL_H - ticker.HEIGHT, message)
 
     # -- static chrome (rendered once, cached) --------------------------
 
@@ -109,7 +110,7 @@ class RichFlightScene(RichScene):
             bg.blit(hdr, (x, inner.y))
 
         # Aircraft separator line
-        sep_y = CONTENT_TOP + 260
+        sep_y = CONTENT_TOP + s(260)
         pygame.draw.line(
             bg, theme.DIM, (CARD_LEFT, sep_y), (CARD_RIGHT, sep_y), 1
         )
@@ -151,19 +152,19 @@ class RichFlightScene(RichScene):
         arrow_surf = self.fonts.xlarge.render(">", True, theme.ACCENT)
         dest_surf = self.fonts.xlarge.render(dest, True, theme.PRIMARY)
 
-        gap = 32
+        gap = s(32)
         total_w = (
             origin_surf.get_width() + arrow_surf.get_width() + dest_surf.get_width() + gap * 2
         )
         x = CARD_LEFT + ((CARD_RIGHT - CARD_LEFT) - total_w) // 2
         surface.blit(origin_surf, (x, y))
-        surface.blit(arrow_surf, (x + origin_surf.get_width() + gap, y + 8))
+        surface.blit(arrow_surf, (x + origin_surf.get_width() + gap, y + s(8)))
         surface.blit(
             dest_surf,
             (x + origin_surf.get_width() + arrow_surf.get_width() + gap * 2, y),
         )
 
-        y2 = y + origin_surf.get_height() + 4
+        y2 = y + origin_surf.get_height() + s(4)
         subline = self._subline_for_route(flight)
         if subline:
             sub_surf = self.fonts.small.render(subline, True, theme.FAINT)
@@ -179,18 +180,18 @@ class RichFlightScene(RichScene):
 
     def _draw_aircraft(self, surface, flight) -> None:
         # Separator line above the title is part of static chrome now.
-        y = CONTENT_TOP + 260
+        y = CONTENT_TOP + s(260)
         plane = flight.plane or "UNKNOWN TYPE"
         reg = flight.registration or ""
         title = plane.upper()
         if reg:
             title = f"{title}   |   REG {reg.upper()}"
         title_surf = self.fonts.large.render(title, True, theme.ACCENT)
-        surface.blit(title_surf, (CARD_LEFT, y + 16))
+        surface.blit(title_surf, (CARD_LEFT, y + s(16)))
 
     def _draw_telemetry(self, surface, flight) -> None:
-        y = CONTENT_TOP + 400
-        row_h = 130
+        y = CONTENT_TOP + s(400)
+        row_h = s(130)
         col_w = (CARD_RIGHT - CARD_LEFT) // 3
 
         rows = [
@@ -208,7 +209,7 @@ class RichFlightScene(RichScene):
         for r, cols in enumerate(rows):
             for c, (label, value, unit) in enumerate(cols):
                 rect = pygame.Rect(
-                    CARD_LEFT + c * col_w, y + r * row_h, col_w - 20, row_h - 20
+                    CARD_LEFT + c * col_w, y + r * row_h, col_w - s(20), row_h - s(20)
                 )
                 field.draw(surface, self.fonts, rect, label, value, unit)
 
@@ -219,7 +220,7 @@ class RichFlightScene(RichScene):
         radar_h = RADAR_BOT - CONTENT_TOP
         cx = RADAR_LEFT + radar_w // 2
         cy = CONTENT_TOP + radar_h // 2
-        outer_r = min(radar_w, radar_h) // 2 - 40
+        outer_r = min(radar_w, radar_h) // 2 - s(40)
         return cx, cy, outer_r
 
     def _draw_radar_dynamic(self, surface, flights, t: float) -> None:
@@ -246,10 +247,10 @@ class RichFlightScene(RichScene):
 
     def _contacts_column_positions(self, inner):
         return [
-            ("CALLSIGN", inner.x + 40),
-            ("HDG", inner.x + 340),
-            ("ALT", inner.x + 480),
-            ("SPD", inner.right - 140),
+            ("CALLSIGN", inner.x + s(40)),
+            ("HDG", inner.x + s(340)),
+            ("ALT", inner.x + s(480)),
+            ("SPD", inner.right - s(140)),
         ]
 
     def _draw_contacts_dynamic(self, surface, flights, current_index: int) -> None:
@@ -276,8 +277,8 @@ class RichFlightScene(RichScene):
             "spd": col_positions[3][1],
         }
 
-        row_h = 62
-        max_rows = max(1, (inner.height - 48) // row_h)
+        row_h = s(62)
+        max_rows = max(1, (inner.height - s(48)) // row_h)
         # Window the visible slice so the currently-featured flight is
         # always on screen when we cycle past the first max_rows contacts.
         if current_index < max_rows:
@@ -288,12 +289,12 @@ class RichFlightScene(RichScene):
         visible = flights[window_start : window_start + max_rows]
         for i, f in enumerate(visible):
             actual_index = window_start + i
-            y = inner.y + 44 + i * row_h
+            y = inner.y + s(44) + i * row_h
             is_current = actual_index == current_index
             colour = theme.PRIMARY if is_current else theme.ACCENT
             if is_current:
                 chev = self.fonts.small.render(">", True, theme.PRIMARY)
-                surface.blit(chev, (col_x["chev"], y - 4))
+                surface.blit(chev, (col_x["chev"], y - s(4)))
             call = self.fonts.small.render(
                 (f.callsign or "?").upper(), True, colour
             )

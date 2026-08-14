@@ -21,8 +21,20 @@ import os
 import sys
 
 
-VIRTUAL_W = 1920
-VIRTUAL_H = 1080
+# SCALE controls the internal virtual resolution.  All widget/scene layout
+# constants are authored in 1080p units and multiplied by SCALE at import,
+# so a Pi 2 or slower host can render at a smaller framebuffer while the
+# physical output stays fullscreen (SDL2 SCALED handles the physical scale).
+# Keep SCALE at an integer divisor of 1.0 for pixel-crisp text on a 1080p
+# HDMI monitor (0.5 -> 2x physical scale, 0.333 -> 3x physical, etc.).
+SCALE = 0.5
+VIRTUAL_W = int(1920 * SCALE)
+VIRTUAL_H = int(1080 * SCALE)
+
+
+def s(px: float) -> int:
+    """Scale a 1080p-authored pixel value to the current virtual resolution."""
+    return int(px * SCALE)
 
 
 class RichScreen:

@@ -14,6 +14,7 @@ import math
 import pygame
 
 from hdmi_rich import theme
+from hdmi_rich.screen import s
 
 
 def _project(cx: int, cy: int, radius: int, az_deg: float, el_deg: float) -> tuple[int, int]:
@@ -28,21 +29,23 @@ def draw_grid(surface, fonts, cx: int, cy: int, radius: int) -> None:
         r = int(radius * (90 - el) / 90)
         pygame.draw.circle(surface, theme.DIM, (cx, cy), r, 1)
 
+    tick_len = s(18)
+    label_off = s(40)
     cardinals = [(0, "N"), (90, "E"), (180, "S"), (270, "W")]
     for az_deg, label in cardinals:
         tx, ty = _project(cx, cy, radius, az_deg, 0)
         ang = math.radians(az_deg - 90)
-        ox = int(tx + math.cos(ang) * 18)
-        oy = int(ty + math.sin(ang) * 18)
+        ox = int(tx + math.cos(ang) * tick_len)
+        oy = int(ty + math.sin(ang) * tick_len)
         pygame.draw.line(surface, theme.ACCENT, (tx, ty), (ox, oy), 2)
-        lx = int(tx + math.cos(ang) * 40)
-        ly = int(ty + math.sin(ang) * 40)
+        lx = int(tx + math.cos(ang) * label_off)
+        ly = int(ty + math.sin(ang) * label_off)
         lbl_surf = fonts.medium.render(label, True, theme.ACCENT)
         surface.blit(
             lbl_surf, (lx - lbl_surf.get_width() // 2, ly - lbl_surf.get_height() // 2)
         )
 
-    pygame.draw.circle(surface, theme.FAINT, (cx, cy), 4, 1)
+    pygame.draw.circle(surface, theme.FAINT, (cx, cy), max(2, s(4)), 1)
 
 
 def draw_animation(
@@ -77,8 +80,8 @@ def draw_animation(
             int(theme.PRIMARY[1] * pulse),
             int(theme.PRIMARY[2] * pulse),
         )
-        pygame.draw.circle(surface, c, (px, py), 12)
-        pygame.draw.circle(surface, theme.PRIMARY, (px, py), 6)
+        pygame.draw.circle(surface, c, (px, py), max(4, s(12)))
+        pygame.draw.circle(surface, theme.PRIMARY, (px, py), max(2, s(6)))
 
 
 def draw(

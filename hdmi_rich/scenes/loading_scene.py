@@ -11,6 +11,7 @@ from __future__ import annotations
 import pygame
 
 from hdmi_rich import theme
+from hdmi_rich.screen import VIRTUAL_H, VIRTUAL_W, s
 from hdmi_rich.widgets import block, header, qr, ticker
 from version import VERSION
 
@@ -29,17 +30,17 @@ class RichLoadingScene:
         title_surf = title_font.render("FLIGHT TRACKER", True, theme.PRIMARY)
         surface.blit(
             title_surf,
-            (1920 // 2 - title_surf.get_width() // 2, 140),
+            (VIRTUAL_W // 2 - title_surf.get_width() // 2, s(140)),
         )
-        subtitle = "ATC-STYLE HDMI OUTPUT"
+        subtitle = "ATC-STYLE OUTPUT"
         sub_surf = self.fonts.medium.render(subtitle, True, theme.ACCENT)
         surface.blit(
             sub_surf,
-            (1920 // 2 - sub_surf.get_width() // 2, 320),
+            (VIRTUAL_W // 2 - sub_surf.get_width() // 2, s(320)),
         )
 
         # System status (left)
-        status_rect = pygame.Rect(64, 420, 900, 460)
+        status_rect = pygame.Rect(s(64), s(420), s(900), s(460))
         inner = block.draw(surface, self.fonts, status_rect, "SYSTEM STATUS")
 
         rows = [
@@ -48,9 +49,9 @@ class RichLoadingScene:
             ("ROUTE", state.get("route", "...")),
             ("IP", state.get("ip", "...")),
         ]
-        row_h = 80
+        row_h = s(80)
         for i, (label, value) in enumerate(rows):
-            y = inner.y + 20 + i * row_h
+            y = inner.y + s(20) + i * row_h
             l_surf = self.fonts.medium.render(label, True, theme.ACCENT)
             v_surf = self.fonts.medium.render(
                 str(value).upper(), True, self._value_colour(str(value))
@@ -59,20 +60,20 @@ class RichLoadingScene:
             surface.blit(v_surf, (inner.right - v_surf.get_width(), y))
 
         # Configuration QR (right)
-        qr_rect = pygame.Rect(1920 - 964, 420, 900, 460)
+        qr_rect = pygame.Rect(VIRTUAL_W - s(964), s(420), s(900), s(460))
         inner = block.draw(surface, self.fonts, qr_rect, "CONFIGURATION")
 
         url = state.get("url")
         if url:
-            qr_surf = qr.surface(url, module_pixels=8)
+            qr_surf = qr.surface(url, module_pixels=max(2, s(8)))
             qs = qr_surf.get_width()
-            surface.blit(qr_surf, (inner.x + (inner.width - qs) // 2, inner.y + 10))
+            surface.blit(qr_surf, (inner.x + (inner.width - qs) // 2, inner.y + s(10)))
             url_surf = self.fonts.small.render(url, True, theme.PRIMARY)
             surface.blit(
                 url_surf,
                 (
                     inner.centerx - url_surf.get_width() // 2,
-                    inner.y + inner.height - 40,
+                    inner.y + inner.height - s(40),
                 ),
             )
         elif state.get("web_disabled"):
@@ -101,7 +102,7 @@ class RichLoadingScene:
         version_str = f"v{'.'.join(map(str, VERSION))}"
         message = state.get("message", "INITIALISING...")
         line = f"{version_str}  |  {message}"
-        ticker.draw(surface, self.fonts, 1080 - ticker.HEIGHT, line)
+        ticker.draw(surface, self.fonts, VIRTUAL_H - ticker.HEIGHT, line)
 
     def _source_label(self) -> str:
         return {

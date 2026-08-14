@@ -27,15 +27,16 @@ import pygame
 from hdmi_rich import theme
 from hdmi_rich.chrome import SceneChrome
 from hdmi_rich.scenes.scene_base import RichScene
+from hdmi_rich.screen import VIRTUAL_H, s
 from hdmi_rich.widgets import azel, block, header, ticker
 
 
 # Fixed layout rects - used by both the static chrome pass and the
-# per-frame dynamic draws.
-_PLOT_RECT = pygame.Rect(24, 120, 900, 840)
-_WIN_RECT = pygame.Rect(948, 120, 940, 260)
-_TEL_RECT = pygame.Rect(948, 400, 940, 300)
-_UP_RECT = pygame.Rect(948, 720, 940, 240)
+# per-frame dynamic draws.  Values authored in 1080p units.
+_PLOT_RECT = pygame.Rect(s(24), s(120), s(900), s(840))
+_WIN_RECT = pygame.Rect(s(948), s(120), s(940), s(260))
+_TEL_RECT = pygame.Rect(s(948), s(400), s(940), s(300))
+_UP_RECT = pygame.Rect(s(948), s(720), s(940), s(240))
 
 CYCLE_SECONDS = 4.0          # dwell on each active sat when there are several
 REFRESH_MAX_AGE = 3600.0     # recompute passes every hour
@@ -139,7 +140,7 @@ class RichSatelliteScene(RichScene):
         # Az-El plot chrome + grid, then the three right-column blocks.
         block.chrome(bg, self.fonts, _PLOT_RECT, "AZ / EL")
         inner = block.inner(_PLOT_RECT)
-        radius = min(inner.width, inner.height) // 2 - 40
+        radius = min(inner.width, inner.height) // 2 - s(40)
         azel.draw_grid(bg, self.fonts, inner.centerx, inner.centery, radius)
 
         block.chrome(bg, self.fonts, _WIN_RECT, "PASS WINDOW")
@@ -165,7 +166,7 @@ class RichSatelliteScene(RichScene):
 
         # -- Az-El animation (trajectory + current pos + beam) -----------
         inner = block.inner(_PLOT_RECT)
-        radius = min(inner.width, inner.height) // 2 - 40
+        radius = min(inner.width, inner.height) // 2 - s(40)
         current = None
         traj = []
         if window is not None:
@@ -186,7 +187,7 @@ class RichSatelliteScene(RichScene):
         # Ticker
         n = len(active)
         line = f"{n} PASS{'ES' if n != 1 else ''} ACTIVE  |  PRESS Q/ESC TO QUIT"
-        ticker.draw(surface, self.fonts, 1080 - ticker.HEIGHT, line)
+        ticker.draw(surface, self.fonts, VIRTUAL_H - ticker.HEIGHT, line)
 
     def _draw_window_info(self, surface, rect, window):
         inner = block.inner(rect)
@@ -203,9 +204,9 @@ class RichSatelliteScene(RichScene):
             ("+ELAPSED", _fmt_hms(max(0, elapsed))),
             ("-REMAIN", _fmt_hms(max(0, remaining))),
         ]
-        row_h = 60
+        row_h = s(60)
         for i, (label, value) in enumerate(rows):
-            y = inner.y + 4 + i * row_h
+            y = inner.y + s(4) + i * row_h
             l = self.fonts.small.render(label, True, theme.ACCENT)
             v = self.fonts.small.render(value, True, theme.PRIMARY)
             surface.blit(l, (inner.x, y))
@@ -235,16 +236,16 @@ class RichSatelliteScene(RichScene):
             ),
             ("ALT", f"{alt_km:,.0f}" if alt_km is not None else "----", "KM"),
         ]
-        row_h = 48
+        row_h = s(48)
         for i, (label, value, unit) in enumerate(rows):
             y = inner.y + i * row_h
             l = self.fonts.medium.render(label, True, theme.ACCENT)
             v = self.fonts.medium.render(value, True, theme.PRIMARY)
             u = self.fonts.small.render(unit, True, theme.FAINT)
             surface.blit(l, (inner.x, y))
-            surface.blit(u, (inner.right - u.get_width(), y + 8))
+            surface.blit(u, (inner.right - u.get_width(), y + s(8)))
             surface.blit(
-                v, (inner.right - u.get_width() - 12 - v.get_width(), y)
+                v, (inner.right - u.get_width() - s(12) - v.get_width(), y)
             )
 
     def _draw_upcoming(self, surface, rect):
@@ -253,13 +254,17 @@ class RichSatelliteScene(RichScene):
         if not upcoming:
             self._dash(surface, inner, "NO UPCOMING PASSES")
             return
-        row_h = 60
-        headers = [("NAME", inner.x), ("AOS", inner.x + 360), ("MAX EL", inner.right - 100)]
+        row_h = s(60)
+        headers = [
+            ("NAME", inner.x),
+            ("AOS", inner.x + s(360)),
+            ("MAX EL", inner.right - s(100)),
+        ]
         for label, x in headers:
             h = self.fonts.small.render(label, True, theme.FAINT)
             surface.blit(h, (x, inner.y))
         for i, w in enumerate(upcoming):
-            y = inner.y + 44 + i * row_h
+            y = inner.y + s(44) + i * row_h
             name = self.fonts.small.render(w.name.upper()[:24], True, theme.PRIMARY)
             aos = self.fonts.small.render(
                 w.aos.strftime("%d %b %H:%M UTC"), True, theme.PRIMARY
@@ -268,8 +273,8 @@ class RichSatelliteScene(RichScene):
                 f"{int(w.max_el)}°", True, theme.PRIMARY
             )
             surface.blit(name, (inner.x, y))
-            surface.blit(aos, (inner.x + 360, y))
-            surface.blit(elmax, (inner.right - 100, y))
+            surface.blit(aos, (inner.x + s(360), y))
+            surface.blit(elmax, (inner.right - s(100), y))
 
     def _dash(self, surface, inner, msg):
         s = self.fonts.medium.render(msg, True, theme.FAINT)

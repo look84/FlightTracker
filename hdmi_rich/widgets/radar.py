@@ -15,6 +15,7 @@ import math
 import pygame
 
 from hdmi_rich import theme
+from hdmi_rich.screen import s
 
 SWEEP_PERIOD_S = 8.0
 RING_COUNT = 4
@@ -36,7 +37,7 @@ def draw_grid(
     pygame.draw.line(surface, theme.DIM, (cx - radius, cy), (cx + radius, cy), 1)
     pygame.draw.line(surface, theme.DIM, (cx, cy - radius), (cx, cy + radius), 1)
 
-    tick_h = 14
+    tick_h = s(14)
     pygame.draw.line(
         surface,
         theme.ACCENT,
@@ -47,11 +48,11 @@ def draw_grid(
     n_surf = fonts.tiny.render("N", True, theme.ACCENT)
     surface.blit(
         n_surf,
-        (cx - n_surf.get_width() // 2, cy - radius - tick_h - n_surf.get_height() - 2),
+        (cx - n_surf.get_width() // 2, cy - radius - tick_h - n_surf.get_height() - s(2)),
     )
     if outer_range_label:
         r_surf = fonts.tiny.render(outer_range_label, True, theme.FAINT)
-        surface.blit(r_surf, (cx + radius + 6, cy - r_surf.get_height() // 2))
+        surface.blit(r_surf, (cx + radius + s(6), cy - r_surf.get_height() // 2))
 
 
 def draw_animation(
@@ -115,9 +116,9 @@ def _draw_sweep_wedge(surface, cx: int, cy: int, radius: int, angle_deg: float) 
 def _draw_blip(surface, bx: float, by: float, sweep_deg: float, bearing_deg: float) -> None:
     delta = (sweep_deg - bearing_deg) % 360
     freshness = 1.0 - min(1.0, delta / (SWEEP_PERIOD_S * 360 / SWEEP_PERIOD_S / 4))
-    pygame.draw.circle(surface, theme.PRIMARY, (int(bx), int(by)), 4)
+    pygame.draw.circle(surface, theme.PRIMARY, (int(bx), int(by)), max(2, s(4)))
     if freshness > 0.0:
-        r = int(6 + 12 * freshness)
+        r = int(s(6) + s(12) * freshness)
         c = (
             int(theme.PRIMARY[0] * freshness),
             int(theme.PRIMARY[1] * freshness),
