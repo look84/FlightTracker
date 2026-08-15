@@ -2,8 +2,9 @@
 Rich satellite scene - ATC-style pass tracker.
 
 Shows a big Az-El polar plot on the left with the trajectory arc and
-live position; the right column stacks a pass-window info block, live
-telemetry (EL/AZ/RNG/SPD/ALT), and an upcoming-passes table.
+live position; the right column stacks a pass-window info block and
+live telemetry (EL/AZ/RNG/SPD/ALT), both expanded to fill the space
+between the header and the ticker.
 
 Wins the scene manager on priority > flight while a pass is active
 (AOS <= now <= LOS) and within the per-pass timeout window.  Reuses the
@@ -31,12 +32,11 @@ from hdmi_rich.screen import VIRTUAL_H, s
 from hdmi_rich.widgets import azel, block, header, ticker
 
 
-# Fixed layout rects - used by both the static chrome pass and the
-# per-frame dynamic draws.  Values authored in 1080p units.
+# Fixed layout rects - values authored in 1080p units.  PASS WINDOW +
+# TELEMETRY now split the right column between them, with a small gap.
 _PLOT_RECT = pygame.Rect(s(24), s(120), s(900), s(840))
-_WIN_RECT = pygame.Rect(s(948), s(120), s(940), s(260))
-_TEL_RECT = pygame.Rect(s(948), s(400), s(940), s(300))
-_UP_RECT = pygame.Rect(s(948), s(720), s(940), s(240))
+_WIN_RECT = pygame.Rect(s(948), s(120), s(940), s(400))
+_TEL_RECT = pygame.Rect(s(948), s(560), s(940), s(400))
 
 CYCLE_SECONDS = 4.0          # dwell on each active sat when there are several
 REFRESH_MAX_AGE = 3600.0     # recompute passes every hour
@@ -126,18 +126,10 @@ class RichSatelliteScene(RichScene):
             int(self.cfg.satellite_timeout_seconds),
         )
 
-    def _upcoming_passes(self, limit: int = 4):
-        now = _dt.datetime.utcnow()
-        with self._lock:
-            snapshot = list(self._pass_windows)
-        future = [w for w in snapshot if w.aos > now]
-        future.sort(key=lambda w: w.aos)
-        return future[:limit]
-
     # ---- draw ---------------------------------------------------------
 
     def _render_static(self, bg) -> None:
-        # Az-El plot chrome + grid, then the three right-column blocks.
+        # Az-El plot chrome + grid, then the two right-column blocks.
         block.chrome(bg, self.fonts, _PLOT_RECT, "AZ / EL")
         inner = block.inner(_PLOT_RECT)
         radius = min(inner.width, inner.height) // 2 - s(40)
@@ -145,7 +137,6 @@ class RichSatelliteScene(RichScene):
 
         block.chrome(bg, self.fonts, _WIN_RECT, "PASS WINDOW")
         block.chrome(bg, self.fonts, _TEL_RECT, "TELEMETRY")
-        block.chrome(bg, self.fonts, _UP_RECT, "UPCOMING PASSES")
 
     def draw(self, screen, t: float) -> None:
         surface = screen.surface
@@ -182,7 +173,6 @@ class RichSatelliteScene(RichScene):
         # -- Right column dynamic content -------------------------------
         self._draw_window_info(surface, _WIN_RECT, window)
         self._draw_telemetry(surface, _TEL_RECT, window)
-        self._draw_upcoming(surface, _UP_RECT)
 
         # Ticker
         n = len(active)
@@ -204,7 +194,7 @@ class RichSatelliteScene(RichScene):
             ("+ELAPSED", _fmt_hms(max(0, elapsed))),
             ("-REMAIN", _fmt_hms(max(0, remaining))),
         ]
-        row_h = s(60)
+        row_h = s(70)
         for i, (label, value) in enumerate(rows):
             y = inner.y + s(4) + i * row_h
             l = self.fonts.small.render(label, True, theme.ACCENT)
@@ -236,7 +226,7 @@ class RichSatelliteScene(RichScene):
             ),
             ("ALT", f"{alt_km:,.0f}" if alt_km is not None else "----", "KM"),
         ]
-        row_h = s(48)
+        row_h = s(70)
         for i, (label, value, unit) in enumerate(rows):
             y = inner.y + i * row_h
             l = self.fonts.medium.render(label, True, theme.ACCENT)
@@ -247,34 +237,6 @@ class RichSatelliteScene(RichScene):
             surface.blit(
                 v, (inner.right - u.get_width() - s(12) - v.get_width(), y)
             )
-
-    def _draw_upcoming(self, surface, rect):
-        inner = block.inner(rect)
-        upcoming = self._upcoming_passes(limit=4)
-        if not upcoming:
-            self._dash(surface, inner, "NO UPCOMING PASSES")
-            return
-        row_h = s(60)
-        headers = [
-            ("NAME", inner.x),
-            ("AOS", inner.x + s(360)),
-            ("MAX EL", inner.right - s(100)),
-        ]
-        for label, x in headers:
-            h = self.fonts.small.render(label, True, theme.FAINT)
-            surface.blit(h, (x, inner.y))
-        for i, w in enumerate(upcoming):
-            y = inner.y + s(44) + i * row_h
-            name = self.fonts.small.render(w.name.upper()[:24], True, theme.PRIMARY)
-            aos = self.fonts.small.render(
-                w.aos.strftime("%d %b %H:%M UTC"), True, theme.PRIMARY
-            )
-            elmax = self.fonts.small.render(
-                f"{int(w.max_el)}°", True, theme.PRIMARY
-            )
-            surface.blit(name, (inner.x, y))
-            surface.blit(aos, (inner.x + s(360), y))
-            surface.blit(elmax, (inner.right - s(100), y))
 
     def _dash(self, surface, inner, msg):
         s = self.fonts.medium.render(msg, True, theme.FAINT)
