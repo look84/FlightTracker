@@ -294,7 +294,10 @@ class RichFlightScene(RichScene):
             ],
             [
                 ("VS", self._fmt_vertical_speed(flight.vertical_speed), "FPM"),
-                ("ETA", self._fmt_eta(eta_s), "MIN"),
+                # "CPA" = closest point of approach: MM:SS until the aircraft
+                # is at its nearest point to the observer given current
+                # heading + ground speed.  --:-- when it's already receding.
+                ("CPA", self._fmt_eta(eta_s), "MM:SS"),
                 ("DIST", self._fmt_distance(dist_km), "KM"),
             ],
         ]
