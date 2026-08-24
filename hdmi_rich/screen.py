@@ -28,9 +28,15 @@ import sys
 # (VT323) stays crisp even when the physical/virtual ratio isn't integer.
 os.environ.setdefault("SDL_HINT_RENDER_SCALE_QUALITY", "0")
 
-# Nudge SDL to kmsdrm on a headless Pi so display.init() succeeds from a
-# bare tty.  Desktop / X / Wayland sessions leave this untouched.
-if not os.environ.get("DISPLAY") and not os.environ.get("WAYLAND_DISPLAY"):
+# Nudge SDL to kmsdrm on a headless Linux tty (Pi in kiosk mode) so
+# display.init() succeeds.  Skip on macOS/Windows - those platforms
+# don't use DISPLAY / kmsdrm at all, and forcing kmsdrm there breaks
+# pygame's default cocoa / windows video drivers.
+if (
+    sys.platform == "linux"
+    and not os.environ.get("DISPLAY")
+    and not os.environ.get("WAYLAND_DISPLAY")
+):
     os.environ.setdefault("SDL_VIDEODRIVER", "kmsdrm")
 
 
