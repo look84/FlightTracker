@@ -110,6 +110,8 @@ class RichScreen:
         self.surface = None
         self._dest_rect = None
         self._direct_draw = False
+        # Most recent tap in virtual-surface coords (drained by consume_touch).
+        self._pending_touch: tuple[int, int] | None = None
         self._init_pygame()
 
     def _init_pygame(self) -> None:
@@ -160,7 +162,11 @@ class RichScreen:
         self._dest_rect = pygame.Rect(dest_x, dest_y, dest_w, dest_h)
 
     def pump_events(self) -> None:
-        """Drain the event queue; exit cleanly on quit/Q/Esc."""
+        """Drain the event queue; exit cleanly on quit/Q/Esc.
+
+        Also captures the most recent left-click / touch tap so scenes
+        can consume it via ``consume_touch()`` and react to interaction.
+        """
         import pygame
 
         for event in pygame.event.get():
@@ -173,6 +179,40 @@ class RichScreen:
                 pygame.K_ESCAPE,
             ):
                 self.shutdown()
+            elif (
+                event.type == pygame.MOUSEBUTTONDOWN
+                and getattr(event, "button", 1) == 1
+            ):
+                pos = self._translate_touch(event.pos[0], event.pos[1])
+                if pos is not None:
+                    self._pending_touch = pos
+
+    def _translate_touch(self, mx: int, my: int) -> tuple[int, int] | None:
+        """Map a raw window-space mouse coord to virtual-surface coord.
+
+        Under ``pygame.SCALED`` (fullscreen) pygame already reports
+        coordinates in the internal-surface space, so no translation is
+        needed.  In the resizable windowed dev mode we undo the CPU-scale
+        applied in ``present()``.  Returns None if the tap fell in the
+        letterbox / outside the drawable area.
+        """
+        if self._direct_draw:
+            # pygame.SCALED already maps to virtual coords.
+            return int(mx), int(my)
+        if self._dest_rect is None or not self._dest_rect.collidepoint(mx, my):
+            return None
+        rel_x = mx - self._dest_rect.x
+        rel_y = my - self._dest_rect.y
+        vx = rel_x * VIRTUAL_W / self._dest_rect.width
+        vy = rel_y * VIRTUAL_H / self._dest_rect.height
+        return int(vx), int(vy)
+
+    def consume_touch(self) -> tuple[int, int] | None:
+        """Return the pending tap (in virtual coords) and clear it, or
+        ``None`` if there wasn't one this frame."""
+        touch = self._pending_touch
+        self._pending_touch = None
+        return touch
 
     def clear(self, colour) -> None:
         self.surface.fill(colour)

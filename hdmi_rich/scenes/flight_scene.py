@@ -18,6 +18,7 @@ through the data pipeline is a later improvement.
 
 from __future__ import annotations
 
+import math
 import time
 
 import pygame
@@ -58,6 +59,11 @@ CYCLE_SECONDS = 5.0
 # refresh.  Prevents flapping to STANDBY every time a single aircraft
 # briefly leaves the zone between fetches.
 HAS_DATA_GRACE_S = 60.0
+# When the user taps a radar blip or contact row, that flight is
+# featured for this many seconds and the auto-cycle is paused.
+OVERRIDE_HOLD_S = 30.0
+# Hit-test tolerance for a radar blip (virtual pixels).
+BLIP_HIT_R = s(24)
 
 
 class RichFlightScene(RichScene):
@@ -76,6 +82,11 @@ class RichFlightScene(RichScene):
         # the grace window (see HAS_DATA_GRACE_S) we render this so the
         # scene doesn't blank out mid-refresh.
         self._last_flights: list = []
+        # Tap-driven override: pins the featured flight for OVERRIDE_HOLD_S
+        # seconds so the auto-cycle stops walking off the aircraft the
+        # operator just tapped.
+        self._override_flight_id: str | None = None
+        self._override_at: float = 0.0
 
     def has_data(self) -> bool:
         """True while there are flights overhead, plus a grace window after
@@ -123,11 +134,19 @@ class RichFlightScene(RichScene):
         self._draw_radar_dynamic(screen.surface, flights, t, primary_index)
         self._draw_contacts_dynamic(screen.surface, flights, primary_index)
 
+        # Handle touch/tap AFTER drawing so the next frame picks up the
+        # new override.  Using the current frame's primary_index for the
+        # contacts-panel hit-test keeps the windowed row layout in sync
+        # with what the user tapped.
+        touch = getattr(screen, "consume_touch", lambda: None)()
+        if touch is not None:
+            self._handle_touch(touch, flights, primary_index)
+
         n_contacts = len(flights)
         source = self._data_source_label()
         message = (
             f"{n_contacts} contact{'s' if n_contacts != 1 else ''} in range "
-            f"|  source: {source}  |  press Q/ESC to quit"
+            f"|  source: {source}  |  tap a blip / row to pin  |  Q/ESC quit"
         )
         ticker.draw(screen.surface, self.fonts, VIRTUAL_H - ticker.HEIGHT, message)
 
@@ -165,6 +184,96 @@ class RichFlightScene(RichScene):
             bg, theme.DIM, (CARD_LEFT, sep_y), (CARD_RIGHT, sep_y), 1
         )
 
+    # -- touch handling ------------------------------------------------
+
+    def _handle_touch(
+        self, touch: tuple[int, int], flights, current_primary_index: int
+    ) -> None:
+        """Resolve a tap to a flight index and pin it as the featured
+        flight.  Falls through to clearing the override when the tap
+        lands on empty space, so a second tap outside anything resumes
+        the auto-cycle immediately."""
+        if not flights:
+            return
+        hit = self._hit_test_blip(touch, flights)
+        if hit is None:
+            hit = self._hit_test_contact_row(
+                touch, flights, current_primary_index
+            )
+        if hit is None:
+            # Tap outside a target - drop any active override.
+            self._override_flight_id = None
+            return
+        self._override_flight_id = flights[hit].flight_id
+        self._override_at = time.monotonic()
+
+    def _hit_test_blip(self, touch, flights) -> int | None:
+        cx, cy, outer_r = self._radar_geometry()
+        # Skip cheaply if tap is nowhere near the radar area.
+        if (
+            not (RADAR_LEFT <= touch[0] <= RADAR_RIGHT)
+            or not (CONTENT_TOP <= touch[1] <= RADAR_BOT)
+        ):
+            return None
+        radius_km = max(1.0, float(self.cfg.flight_radius))
+        best_idx: int | None = None
+        best_dist_sq = float("inf")
+        for i, f in enumerate(flights):
+            if f.lat is None or f.lng is None:
+                bearing = float(int(f.heading or 0) % 360)
+                range_norm = 0.5
+            else:
+                bearing, dist_km = bearing_and_distance(
+                    self.cfg.flight_lat, self.cfg.flight_lng, f.lat, f.lng
+                )
+                range_norm = min(1.0, dist_km / radius_km)
+            rng = max(0.0, min(1.0, range_norm)) * outer_r
+            ang = math.radians(bearing - 90)
+            bx = cx + math.cos(ang) * rng
+            by = cy + math.sin(ang) * rng
+            dsq = (touch[0] - bx) ** 2 + (touch[1] - by) ** 2
+            if dsq < BLIP_HIT_R ** 2 and dsq < best_dist_sq:
+                best_dist_sq = dsq
+                best_idx = i
+        return best_idx
+
+    def _hit_test_contact_row(
+        self, touch, flights, current_primary_index: int
+    ) -> int | None:
+        rect = self._contacts_rect()
+        if not rect.collidepoint(*touch):
+            return None
+        inner = block.inner(rect)
+        col_a, col_b = self._contacts_col_rects(inner)
+        if col_a.collidepoint(*touch):
+            col_offset = 0
+            col_rect = col_a
+        elif col_b.collidepoint(*touch):
+            col_offset = CONTACTS_ROWS_PER_COL
+            col_rect = col_b
+        else:
+            return None
+
+        # Recompute the same window_start used by _draw_contacts_dynamic
+        # so we translate the tapped row back to a real flight index.
+        if current_primary_index < CONTACTS_MAX_ROWS:
+            window_start = 0
+        else:
+            window_start = current_primary_index - CONTACTS_MAX_ROWS + 1
+        window_start = min(
+            window_start, max(0, len(flights) - CONTACTS_MAX_ROWS)
+        )
+
+        row_h = CONTACTS_ROW_H
+        base_y = col_rect.y + s(40)
+        row_i = (touch[1] - base_y) // row_h
+        if row_i < 0 or row_i >= CONTACTS_ROWS_PER_COL:
+            return None
+        idx = window_start + col_offset + row_i
+        if idx >= len(flights):
+            return None
+        return idx
+
     # -- ordering -------------------------------------------------------
 
     def _sorted_flights(self, flights):
@@ -188,7 +297,9 @@ class RichFlightScene(RichScene):
     # -- cycling --------------------------------------------------------
 
     def _pick_primary_index(self, flights, _t: float) -> int:
-        """Advance the featured-flight cycle when multiple contacts are in range.
+        """Advance the featured-flight cycle when multiple contacts are in
+        range.  A tap-driven override wins for OVERRIDE_HOLD_S seconds so
+        the operator can pin a specific contact.
 
         Uses ``time.monotonic()`` directly rather than the animation clock
         so the cycle timing is unaffected by scene transitions.
@@ -198,6 +309,22 @@ class RichFlightScene(RichScene):
         if n == 0:
             self._cycle_index = 0
             return 0
+
+        # Manual override wins while the hold window is active AND the
+        # pinned flight is still in the list.
+        if (
+            self._override_flight_id is not None
+            and now - self._override_at < OVERRIDE_HOLD_S
+        ):
+            for i, f in enumerate(flights):
+                if f.flight_id == self._override_flight_id:
+                    self._cycle_index = i
+                    self._cycle_last = now
+                    self._last_flight_id = f.flight_id
+                    return i
+            # Pinned flight left the zone - drop the override.
+            self._override_flight_id = None
+
         if n == 1:
             self._cycle_index = 0
             self._cycle_last = now
