@@ -43,16 +43,10 @@ def draw(
     pygame.draw.rect(surface, chrome_colour, pygame.Rect(0, 0, w, HEIGHT), 2)
 
     if is_active:
-        # Left-justified state label.  Green ACTIVE for auto-cycle mode,
-        # amber LOCKED when the operator has tapped a specific contact
-        # to pin it.
-        if is_locked:
-            label_text = "LOCKED"
-            label_colour = theme.ACCENT
-        else:
-            label_text = "ACTIVE"
-            label_colour = theme.PRIMARY
-        label_surf = fonts.medium.render(label_text, True, label_colour)
+        # Left-justified state label - green in both cases; the label
+        # text is the distinguisher (ACTIVE = auto-cycle, LOCKED = pinned).
+        label_text = "LOCKED" if is_locked else "ACTIVE"
+        label_surf = fonts.medium.render(label_text, True, theme.PRIMARY)
         surface.blit(
             label_surf, (_PAD_X, HEIGHT // 2 - label_surf.get_height() // 2)
         )

@@ -593,7 +593,7 @@ class RichFlightScene(RichScene):
                 and f.flight_id == self._override_flight_id
             )
 
-            # Amber outlined bracket around the entire pinned row.  Big
+            # Green outlined bracket around the entire pinned row.  Big
             # unambiguous "this one is locked" signal that reads even on
             # small physical displays.  Drawn BEFORE text so the outline
             # sits behind the values.
@@ -606,7 +606,7 @@ class RichFlightScene(RichScene):
                     col_rect.width + pad_x * 2,
                     text_h + pad_y * 2,
                 )
-                pygame.draw.rect(surface, theme.ACCENT, highlight, 2)
+                pygame.draw.rect(surface, theme.PRIMARY, highlight, 2)
 
             colour = theme.PRIMARY if is_current else theme.ACCENT
             if is_current and not pin_active:
@@ -641,7 +641,7 @@ class RichFlightScene(RichScene):
             if pin_active:
                 icx, icy = self._lock_icon_center(col_rect, y, text_h)
                 lock_icon.draw(
-                    surface, icx, icy, self._lock_icon_size(text_h), theme.ACCENT
+                    surface, icx, icy, self._lock_icon_size(text_h), theme.PRIMARY
                 )
 
     # -- geo helpers ----------------------------------------------------
