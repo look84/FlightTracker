@@ -28,7 +28,7 @@ from hdmi_rich.chrome import SceneChrome
 from hdmi_rich.geo import bearing_and_distance, eta_closest_approach_seconds
 from hdmi_rich.scenes.scene_base import RichScene
 from hdmi_rich.screen import VIRTUAL_H, VIRTUAL_W, s
-from hdmi_rich.widgets import block, field, header, lock_icon, radar, ticker
+from hdmi_rich.widgets import block, field, header, radar, ticker
 
 CONTENT_TOP = header.HEIGHT + s(24)
 CONTENT_BOT = VIRTUAL_H - ticker.HEIGHT - s(24)
@@ -497,10 +497,10 @@ class RichFlightScene(RichScene):
     def _contacts_column_layout(self, col_rect):
         """Header/data column positions within a single contacts column.
 
-        Anchors mostly follow their original positions.  DIST is nudged
-        left just enough to leave a small tail on the right for the
-        pinned-row padlock icon; other columns keep the same spread they
-        had before pin-mode existed.
+        Anchors span the column edge-to-edge; the green outline drawn
+        around the pinned row (plus the LOCKED header label) carries the
+        pinned-state signal, so no tail needs to be reserved for a lock
+        icon inside the row.
         """
         w = col_rect.width
         return [
@@ -508,26 +508,8 @@ class RichFlightScene(RichScene):
             ("HDG", col_rect.x + int(w * 0.28)),
             ("ALT", col_rect.x + int(w * 0.46)),
             ("SPD", col_rect.x + int(w * 0.66)),
-            ("DIST", col_rect.x + int(w * 0.78)),
+            ("DIST", col_rect.x + int(w * 0.84)),
         ]
-
-    def _lock_icon_center(self, col_rect, y: int, text_h: int) -> tuple[int, int]:
-        """Where to centre the padlock icon on a pinned row.
-
-        Sits inside col_rect at the right, with padding on all four
-        sides between the icon and the outline rectangle - the icon is
-        deliberately smaller than the row height so its body doesn't
-        touch the outline's bottom stroke.
-        """
-        cx = col_rect.right - self._lock_icon_size(text_h) // 2 - s(10)
-        cy = y + text_h // 2
-        return cx, cy
-
-    @staticmethod
-    def _lock_icon_size(text_h: int) -> int:
-        """Slightly smaller than a text row so top and bottom both get a
-        sliver of clearance from the amber outline rectangle."""
-        return int(text_h * 0.8)
 
     def _draw_contacts_dynamic(self, surface, flights, current_index: int) -> None:
         rect = self._contacts_rect()
@@ -635,14 +617,6 @@ class RichFlightScene(RichScene):
             surface.blit(alt, (col_x["alt"], y))
             surface.blit(spd, (col_x["spd"], y))
             surface.blit(dist, (col_x["dist"], y))
-
-            # Padlock icon at the right end of the pinned row, in the
-            # small tail past DIST reserved by _contacts_column_layout.
-            if pin_active:
-                icx, icy = self._lock_icon_center(col_rect, y, text_h)
-                lock_icon.draw(
-                    surface, icx, icy, self._lock_icon_size(text_h), theme.PRIMARY
-                )
 
     # -- geo helpers ----------------------------------------------------
 
