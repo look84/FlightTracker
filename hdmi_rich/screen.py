@@ -25,9 +25,17 @@ import sys
 # constants are authored in 1080p units and multiplied by SCALE at import,
 # so a Pi 2 or slower host can render at a smaller framebuffer while the
 # physical output stays fullscreen (SDL2 SCALED handles the physical scale).
-# Keep SCALE at an integer divisor of 1.0 for pixel-crisp text on a 1080p
-# HDMI monitor (0.5 -> 2x physical scale, 0.333 -> 3x physical, etc.).
-SCALE = 0.5
+#
+# For pixel-crisp text on the attached display, pick a SCALE whose product
+# with 1080 divides evenly into the physical height (or matches it).
+# Common presets:
+#   SCALE=0.5     -> 960x540  (integer 2x -> 1080p HDMI, pixel-crisp)
+#   SCALE=0.4167  -> 800x450  (matches 800x480 IPS width; 15px letterbox)
+#   SCALE=0.333   -> 640x360  (integer 3x -> 1080p HDMI)
+#   SCALE=1.0     -> 1920x1080 (Pi 4/5, native)
+#
+# Override at launch: FLIGHTTRACKER_SCALE=0.4167 ./flight-tracker.py --panel hdmi-rich
+SCALE = float(os.environ.get("FLIGHTTRACKER_SCALE", "0.5"))
 VIRTUAL_W = int(1920 * SCALE)
 VIRTUAL_H = int(1080 * SCALE)
 
@@ -56,6 +64,11 @@ class RichScreen:
         if self.fullscreen:
             if not os.environ.get("DISPLAY") and not os.environ.get("WAYLAND_DISPLAY"):
                 os.environ.setdefault("SDL_VIDEODRIVER", "kmsdrm")
+
+        # Force nearest-neighbour scaling on the SDL2 renderer so
+        # pixel-art text (VT323) stays crisp even at non-integer scale
+        # factors like 800/960 = 0.833.  "0" = nearest, "1" = linear.
+        os.environ.setdefault("SDL_HINT_RENDER_SCALE_QUALITY", "0")
 
         import pygame
 
