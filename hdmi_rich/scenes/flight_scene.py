@@ -149,9 +149,14 @@ class RichFlightScene(RichScene):
 
         n_contacts = len(flights)
         source = self._data_source_label()
+        interaction = (
+            "tap empty area to unpin"
+            if is_locked
+            else "tap a blip / row to pin"
+        )
         message = (
             f"{n_contacts} contact{'s' if n_contacts != 1 else ''} in range "
-            f"|  source: {source}  |  tap a blip / row to pin  |  Q/ESC quit"
+            f"|  source: {source}  |  {interaction}  |  Q/ESC quit"
         )
         ticker.draw(screen.surface, self.fonts, VIRTUAL_H - ticker.HEIGHT, message)
 
@@ -493,17 +498,28 @@ class RichFlightScene(RichScene):
         """Header/data column positions within a single contacts column.
 
         Anchors are packed left-of-centre with just enough space for each
-        value so the rightmost column (DIST) still fits inside col_rect
-        rather than spilling into the divider / adjacent column.
+        value.  The rightmost ~s(60) of the column is reserved for a
+        padlock icon in the pinned row - see ``_lock_icon_center``.
         """
         w = col_rect.width
         return [
             ("CALLSIGN", col_rect.x + s(20)),
-            ("HDG", col_rect.x + int(w * 0.28)),
-            ("ALT", col_rect.x + int(w * 0.46)),
-            ("SPD", col_rect.x + int(w * 0.66)),
-            ("DIST", col_rect.x + int(w * 0.84)),
+            ("HDG", col_rect.x + int(w * 0.26)),
+            ("ALT", col_rect.x + int(w * 0.42)),
+            ("SPD", col_rect.x + int(w * 0.58)),
+            ("DIST", col_rect.x + int(w * 0.74)),
         ]
+
+    def _lock_icon_center(self, col_rect, y: int, text_h: int) -> tuple[int, int]:
+        """Where to centre the padlock icon on a pinned row.
+
+        Sits inside col_rect at the right, with enough padding that it
+        doesn't crowd the outline rectangle drawn around the row.
+        """
+        icon_size = int(text_h * 1.1)
+        cx = col_rect.right - icon_size // 2 - s(12)
+        cy = y + text_h // 2
+        return cx, cy
 
     def _draw_contacts_dynamic(self, surface, flights, current_index: int) -> None:
         rect = self._contacts_rect()
@@ -585,19 +601,12 @@ class RichFlightScene(RichScene):
                 pygame.draw.rect(surface, theme.ACCENT, highlight, 2)
 
             colour = theme.PRIMARY if is_current else theme.ACCENT
-            if is_current:
-                if pin_active:
-                    # Padlock icon sized to the row text height, vertically
-                    # centred on the text baseline.
-                    icon_size = int(text_h * 1.1)
-                    icon_cx = col_x["chev"] + icon_size // 2
-                    icon_cy = y + text_h // 2
-                    lock_icon.draw(
-                        surface, icon_cx, icon_cy, icon_size, theme.ACCENT
-                    )
-                else:
-                    chev = self.fonts.small.render(">", True, theme.PRIMARY)
-                    surface.blit(chev, (col_x["chev"], y - s(2)))
+            if is_current and not pin_active:
+                # Auto-cycle: chevron in the marker slot.  For pinned rows
+                # the amber outline + the right-side padlock icon are the
+                # signal, so no chevron.
+                chev = self.fonts.small.render(">", True, theme.PRIMARY)
+                surface.blit(chev, (col_x["chev"], y - s(2)))
             call = self.fonts.small.render(
                 (f.callsign or "?").upper(), True, colour
             )
@@ -618,6 +627,14 @@ class RichFlightScene(RichScene):
             surface.blit(alt, (col_x["alt"], y))
             surface.blit(spd, (col_x["spd"], y))
             surface.blit(dist, (col_x["dist"], y))
+
+            # Padlock icon at the right end of the pinned row, comfortably
+            # inside the amber outline padding.
+            if pin_active:
+                icx, icy = self._lock_icon_center(col_rect, y, text_h)
+                lock_icon.draw(
+                    surface, icx, icy, int(text_h * 1.1), theme.ACCENT
+                )
 
     # -- geo helpers ----------------------------------------------------
 
