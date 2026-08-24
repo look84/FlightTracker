@@ -146,13 +146,15 @@ def _draw_blip(
 
     if is_current:
         # Larger bright green dot + amber target ring for the featured
-        # blip.  The ring is a thicker stroke when tap-pinned so the
-        # "locked" contact is unmistakable on the plot.
-        ring_width = 5 if is_locked else 2
+        # blip.  When tap-pinned we add a second outer amber ring so
+        # the "locked" contact reads unmistakably as a bracketed
+        # target from a glance at the plot.
         pygame.draw.circle(surface, theme.PRIMARY, (ix, iy), max(3, s(7)))
-        pygame.draw.circle(
-            surface, theme.ACCENT, (ix, iy), max(6, s(14)), ring_width
-        )
+        pygame.draw.circle(surface, theme.ACCENT, (ix, iy), max(6, s(14)), 2)
+        if is_locked:
+            pygame.draw.circle(
+                surface, theme.ACCENT, (ix, iy), max(10, s(24)), 2
+            )
     else:
         pygame.draw.circle(surface, theme.PRIMARY, (ix, iy), max(2, s(4)))
 
