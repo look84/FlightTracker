@@ -497,27 +497,28 @@ class RichFlightScene(RichScene):
     def _contacts_column_layout(self, col_rect):
         """Header/data column positions within a single contacts column.
 
-        Anchors are packed left-of-centre with just enough space for each
-        value.  The rightmost ~s(60) of the column is reserved for a
-        padlock icon in the pinned row - see ``_lock_icon_center``.
+        Anchors mostly follow their original positions.  DIST is nudged
+        left just enough to leave a small tail on the right for the
+        pinned-row padlock icon; other columns keep the same spread they
+        had before pin-mode existed.
         """
         w = col_rect.width
         return [
             ("CALLSIGN", col_rect.x + s(20)),
-            ("HDG", col_rect.x + int(w * 0.26)),
-            ("ALT", col_rect.x + int(w * 0.42)),
-            ("SPD", col_rect.x + int(w * 0.58)),
-            ("DIST", col_rect.x + int(w * 0.74)),
+            ("HDG", col_rect.x + int(w * 0.28)),
+            ("ALT", col_rect.x + int(w * 0.46)),
+            ("SPD", col_rect.x + int(w * 0.66)),
+            ("DIST", col_rect.x + int(w * 0.78)),
         ]
 
     def _lock_icon_center(self, col_rect, y: int, text_h: int) -> tuple[int, int]:
         """Where to centre the padlock icon on a pinned row.
 
-        Sits inside col_rect at the right, with enough padding that it
-        doesn't crowd the outline rectangle drawn around the row.
+        Sits inside col_rect at the right, with padding so it doesn't
+        crowd the outline rectangle drawn around the row.
         """
-        icon_size = int(text_h * 1.1)
-        cx = col_rect.right - icon_size // 2 - s(12)
+        icon_size = text_h
+        cx = col_rect.right - icon_size // 2 - s(10)
         cy = y + text_h // 2
         return cx, cy
 
@@ -628,13 +629,11 @@ class RichFlightScene(RichScene):
             surface.blit(spd, (col_x["spd"], y))
             surface.blit(dist, (col_x["dist"], y))
 
-            # Padlock icon at the right end of the pinned row, comfortably
-            # inside the amber outline padding.
+            # Padlock icon at the right end of the pinned row, in the
+            # small tail past DIST reserved by _contacts_column_layout.
             if pin_active:
                 icx, icy = self._lock_icon_center(col_rect, y, text_h)
-                lock_icon.draw(
-                    surface, icx, icy, int(text_h * 1.1), theme.ACCENT
-                )
+                lock_icon.draw(surface, icx, icy, text_h, theme.ACCENT)
 
     # -- geo helpers ----------------------------------------------------
 
