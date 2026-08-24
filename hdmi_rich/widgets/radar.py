@@ -145,17 +145,11 @@ def _draw_blip(
     ix, iy = int(bx), int(by)
 
     if is_current:
-        # Larger bright dot + a green target ring.  When tap-pinned we
-        # add a second concentric ring so shape (not colour) carries
-        # the pinned distinction - keeps green as the "selected" colour
-        # everywhere on screen (radar / contacts row / header LOCKED
-        # label all agree).
+        # Larger bright dot + a single green target ring for the
+        # featured blip (auto-cycled or pinned - the pinned distinction
+        # is carried on the contacts row / header instead).
         pygame.draw.circle(surface, theme.PRIMARY, (ix, iy), max(3, s(7)))
         pygame.draw.circle(surface, theme.PRIMARY, (ix, iy), max(6, s(14)), 2)
-        if is_locked:
-            pygame.draw.circle(
-                surface, theme.PRIMARY, (ix, iy), max(9, s(22)), 2
-            )
     else:
         pygame.draw.circle(surface, theme.PRIMARY, (ix, iy), max(2, s(4)))
 
