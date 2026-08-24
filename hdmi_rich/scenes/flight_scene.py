@@ -514,13 +514,20 @@ class RichFlightScene(RichScene):
     def _lock_icon_center(self, col_rect, y: int, text_h: int) -> tuple[int, int]:
         """Where to centre the padlock icon on a pinned row.
 
-        Sits inside col_rect at the right, with padding so it doesn't
-        crowd the outline rectangle drawn around the row.
+        Sits inside col_rect at the right, with padding on all four
+        sides between the icon and the outline rectangle - the icon is
+        deliberately smaller than the row height so its body doesn't
+        touch the outline's bottom stroke.
         """
-        icon_size = text_h
-        cx = col_rect.right - icon_size // 2 - s(10)
+        cx = col_rect.right - self._lock_icon_size(text_h) // 2 - s(10)
         cy = y + text_h // 2
         return cx, cy
+
+    @staticmethod
+    def _lock_icon_size(text_h: int) -> int:
+        """Slightly smaller than a text row so top and bottom both get a
+        sliver of clearance from the amber outline rectangle."""
+        return int(text_h * 0.8)
 
     def _draw_contacts_dynamic(self, surface, flights, current_index: int) -> None:
         rect = self._contacts_rect()
@@ -633,7 +640,9 @@ class RichFlightScene(RichScene):
             # small tail past DIST reserved by _contacts_column_layout.
             if pin_active:
                 icx, icy = self._lock_icon_center(col_rect, y, text_h)
-                lock_icon.draw(surface, icx, icy, text_h, theme.ACCENT)
+                lock_icon.draw(
+                    surface, icx, icy, self._lock_icon_size(text_h), theme.ACCENT
+                )
 
     # -- geo helpers ----------------------------------------------------
 
