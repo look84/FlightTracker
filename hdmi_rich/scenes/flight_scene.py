@@ -516,9 +516,16 @@ class RichFlightScene(RichScene):
                 )
                 range_norm = min(1.0, dist_km / radius_km)
             contacts.append((bearing, range_norm, f.callsign))
+        locked = (
+            flights
+            and 0 <= current_index < len(flights)
+            and self._override_flight_id is not None
+            and flights[current_index].flight_id == self._override_flight_id
+        )
         radar.draw_animation(
             surface, self.fonts, cx, cy, outer_r, contacts, t,
             current_index=current_index,
+            locked=bool(locked),
         )
 
     # -- contacts panel (dynamic) ---------------------------------------

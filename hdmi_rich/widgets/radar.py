@@ -64,13 +64,16 @@ def draw_animation(
     contacts: list[tuple[float, float, str]],
     t: float,
     current_index: int = -1,
+    locked: bool = False,
 ) -> None:
     """Dynamic radar bits: sweep wedge + contact blips.
 
-    ``current_index`` is the index into *contacts* of the flight
-    currently featured in the main data card; that blip renders with
-    an amber "target ring" so the operator can see at a glance which
-    dot on the plot maps to the callsign in the header.
+    ``current_index`` marks the flight currently featured in the main
+    data card; ``locked`` is True when the operator has tapped to pin
+    that flight.  The featured blip renders with a green target ring
+    when auto-cycling and an amber ring when locked - matching the
+    ATC pattern of "target designated" (amber) vs "target selected"
+    (green).
     """
     sweep_angle_deg = (t / SWEEP_PERIOD_S) * 360 % 360
     _draw_sweep_wedge(surface, cx, cy, radius, sweep_angle_deg)
@@ -87,6 +90,7 @@ def draw_animation(
             sweep_angle_deg,
             bearing_deg,
             is_current=(i == current_index),
+            is_locked=(i == current_index and locked),
         )
 
 
@@ -134,16 +138,19 @@ def _draw_blip(
     sweep_deg: float,
     bearing_deg: float,
     is_current: bool = False,
+    is_locked: bool = False,
 ) -> None:
     delta = (sweep_deg - bearing_deg) % 360
     freshness = 1.0 - min(1.0, delta / (SWEEP_PERIOD_S * 360 / SWEEP_PERIOD_S / 4))
     ix, iy = int(bx), int(by)
 
     if is_current:
-        # Larger bright dot + an amber target ring so the featured flight
-        # stands out from other contacts on the plot.
+        # Larger bright dot + a target ring.  Amber when tap-pinned,
+        # green when auto-cycled - matches the CONTACTS-row visual
+        # (green outline + LOCKED header for pinned).
+        ring_colour = theme.ACCENT if is_locked else theme.PRIMARY
         pygame.draw.circle(surface, theme.PRIMARY, (ix, iy), max(3, s(7)))
-        pygame.draw.circle(surface, theme.ACCENT, (ix, iy), max(6, s(14)), 2)
+        pygame.draw.circle(surface, ring_colour, (ix, iy), max(6, s(14)), 2)
     else:
         pygame.draw.circle(surface, theme.PRIMARY, (ix, iy), max(2, s(4)))
 
