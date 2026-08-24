@@ -145,11 +145,14 @@ def _draw_blip(
     ix, iy = int(bx), int(by)
 
     if is_current:
-        # Larger bright dot + a single green target ring for the
-        # featured blip (auto-cycled or pinned - the pinned distinction
-        # is carried on the contacts row / header instead).
+        # Larger bright green dot + amber target ring for the featured
+        # blip.  The ring is a thicker stroke when tap-pinned so the
+        # "locked" contact is unmistakable on the plot.
+        ring_width = 5 if is_locked else 2
         pygame.draw.circle(surface, theme.PRIMARY, (ix, iy), max(3, s(7)))
-        pygame.draw.circle(surface, theme.PRIMARY, (ix, iy), max(6, s(14)), 2)
+        pygame.draw.circle(
+            surface, theme.ACCENT, (ix, iy), max(6, s(14)), ring_width
+        )
     else:
         pygame.draw.circle(surface, theme.PRIMARY, (ix, iy), max(2, s(4)))
 
