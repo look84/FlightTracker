@@ -168,17 +168,20 @@ class RichDisplay:
     # -- overhead ---------------------------------------------------------
 
     def _build_overhead(self):
+        """Return (overhead_instance, refresh_seconds).
+
+        Uses the shared ``display.get_overhead_instance()`` singleton so
+        the Flask ``/live-data`` diagnostic panel and any other consumer
+        see the same object the rich display renders from.
+        """
+        from display import get_overhead_instance
+
+        overhead = get_overhead_instance()
         if self.cfg.use_tar1090:
-            from utilities.overhead_tar1090 import Overhead
-
-            return Overhead(), 10
+            return overhead, 10
         if self.cfg.use_osn:
-            from utilities.overhead_osn import Overhead
-
-            return Overhead(), 22
-        from utilities.overhead_fr24 import Overhead
-
-        return Overhead(), 30
+            return overhead, 22
+        return overhead, 30
 
     def _start_weather_service(self):
         """Kick the shared WeatherService singleton so its background fetch
@@ -202,19 +205,21 @@ class RichDisplay:
     def _refresh_loop(self, overhead, interval: int, stop_flag: threading.Event) -> None:
         # Heartbeat log so a stuck overhead.refresh() (e.g. FR24's HTTP
         # call hanging without a hard timeout) is visible in /logs.
-        started_at = time.monotonic()
+        # INFO level so it lands in the MemoryLogHandler buffer at
+        # default log_level.
         tick = 0
         while not stop_flag.is_set():
+            tick += 1
+            t0 = time.monotonic()
             try:
                 overhead.refresh()
-                tick += 1
-                if tick % 4 == 1:
-                    self.logger.debug(
-                        "overhead.refresh tick=%d age=%.0fs data_len=%d",
-                        tick,
-                        time.monotonic() - started_at,
-                        len(getattr(overhead, "data", None) or []),
-                    )
+                dt = time.monotonic() - t0
+                self.logger.info(
+                    "overhead.refresh tick=%d duration=%.1fs data_len=%d",
+                    tick,
+                    dt,
+                    len(getattr(overhead, "data", None) or []),
+                )
             except Exception:
                 self.logger.exception("overhead.refresh() failed")
             if stop_flag.wait(interval):
