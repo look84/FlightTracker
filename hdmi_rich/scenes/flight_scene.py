@@ -555,6 +555,7 @@ class RichFlightScene(RichScene):
             "spd": cols[3][1],
             "dist": cols[4][1],
         }
+        text_h = self.fonts.small.get_height()
         for i in range(CONTACTS_ROWS_PER_COL):
             idx = base_idx + i
             if idx >= len(flights):
@@ -562,21 +563,37 @@ class RichFlightScene(RichScene):
             f = flights[idx]
             y = col_rect.y + s(40) + i * row_h
             is_current = idx == current_index
+            pin_active = (
+                is_current
+                and self._override_flight_id is not None
+                and f.flight_id == self._override_flight_id
+            )
+
+            # Amber outlined bracket around the entire pinned row.  Big
+            # unambiguous "this one is locked" signal that reads even on
+            # small physical displays.  Drawn BEFORE text so the outline
+            # sits behind the values.
+            if pin_active:
+                pad_x = s(8)
+                pad_y = s(6)
+                highlight = pygame.Rect(
+                    col_rect.x - pad_x,
+                    y - pad_y,
+                    col_rect.width + pad_x * 2,
+                    text_h + pad_y * 2,
+                )
+                pygame.draw.rect(surface, theme.ACCENT, highlight, 2)
+
             colour = theme.PRIMARY if is_current else theme.ACCENT
             if is_current:
-                # Padlock icon when the featured flight is tap-pinned;
-                # chevron ">" when we're in the auto-cycling rotation.
-                pin_active = (
-                    self._override_flight_id is not None
-                    and f.flight_id == self._override_flight_id
-                )
                 if pin_active:
+                    # Padlock icon sized to the row text height, vertically
+                    # centred on the text baseline.
+                    icon_size = int(text_h * 1.1)
+                    icon_cx = col_x["chev"] + icon_size // 2
+                    icon_cy = y + text_h // 2
                     lock_icon.draw(
-                        surface,
-                        col_x["chev"] + s(10),
-                        y + s(18),
-                        s(32),
-                        theme.ACCENT,
+                        surface, icon_cx, icon_cy, icon_size, theme.ACCENT
                     )
                 else:
                     chev = self.fonts.small.render(">", True, theme.PRIMARY)
