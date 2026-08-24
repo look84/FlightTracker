@@ -21,23 +21,75 @@ import os
 import sys
 
 
-# SCALE controls the internal virtual resolution.  All widget/scene layout
-# constants are authored in 1080p units and multiplied by SCALE at import,
-# so a Pi 2 or slower host can render at a smaller framebuffer while the
-# physical output stays fullscreen (SDL2 SCALED handles the physical scale).
+# --- one-time SDL setup that must happen before pygame's video subsystem
+# initialises anywhere in the app --------------------------------------
+
+# Force nearest-neighbour scaling on the SDL2 renderer so pixel-art text
+# (VT323) stays crisp even when the physical/virtual ratio isn't integer.
+os.environ.setdefault("SDL_HINT_RENDER_SCALE_QUALITY", "0")
+
+# Nudge SDL to kmsdrm on a headless Pi so display.init() succeeds from a
+# bare tty.  Desktop / X / Wayland sessions leave this untouched.
+if not os.environ.get("DISPLAY") and not os.environ.get("WAYLAND_DISPLAY"):
+    os.environ.setdefault("SDL_VIDEODRIVER", "kmsdrm")
+
+
+# --- virtual-resolution detection -------------------------------------
 #
-# For pixel-crisp text on the attached display, pick a SCALE whose product
-# with 1080 divides evenly into the physical height (or matches it).
-# Common presets:
-#   SCALE=0.5     -> 960x540  (integer 2x -> 1080p HDMI, pixel-crisp)
-#   SCALE=0.4167  -> 800x450  (matches 800x480 IPS width; 15px letterbox)
-#   SCALE=0.333   -> 640x360  (integer 3x -> 1080p HDMI)
-#   SCALE=1.0     -> 1920x1080 (Pi 4/5, native)
+# All widget/scene layout constants are authored in 1080p units and
+# multiplied by SCALE at import.  For pixel-crisp text the virtual
+# framebuffer must map cleanly to physical pixels - either 1:1
+# (virtual matches physical width) or as an integer 1:N downscale.
 #
-# Override at launch: FLIGHTTRACKER_SCALE=0.4167 ./flight-tracker.py --panel hdmi-rich
-SCALE = float(os.environ.get("FLIGHTTRACKER_SCALE", "0.5"))
-VIRTUAL_W = int(1920 * SCALE)
-VIRTUAL_H = int(1080 * SCALE)
+# We pick SCALE automatically by querying the physical display at import
+# time and finding the largest 1:N mapping that stays at or below the
+# Pi-2 performance ceiling (SCALE <= 0.5).  Sample outputs:
+#
+#     Physical 1920x1080   -> virtual  960x540   (N=2, SCALE=0.5)
+#     Physical 1280x720    -> virtual  640x360   (N=2, SCALE=0.333)
+#     Physical  800x480    -> virtual  800x450   (N=1, SCALE=0.4167)
+#     Physical  640x480    -> virtual  640x360   (N=1, SCALE=0.333)
+#
+# FLIGHTTRACKER_SCALE=<float> overrides the detection if you know better.
+
+_PERF_CAP_SCALE = 0.5   # keeps Pi 2 rendering at ~20 fps
+
+
+def _detect_dimensions() -> tuple[int, int, float]:
+    """Return ``(virtual_w, virtual_h, scale)`` for the attached display."""
+    env = os.environ.get("FLIGHTTRACKER_SCALE")
+    if env:
+        try:
+            scale = float(env)
+            return int(1920 * scale), int(1080 * scale), scale
+        except ValueError:
+            pass
+
+    try:
+        import pygame
+
+        pygame.display.init()
+        sizes = pygame.display.get_desktop_sizes()
+        if not sizes:
+            raise RuntimeError("no display sizes reported")
+        phys_w, _phys_h = sizes[0]
+        # Try 1:1, 1:2, 1:3, 1:4 physical-to-virtual mappings.  First scale
+        # at or below the perf cap wins - that's the sharpest option this
+        # host can afford.
+        for divisor in (1, 2, 3, 4):
+            virtual_w = phys_w // divisor
+            scale = virtual_w / 1920.0
+            if scale <= _PERF_CAP_SCALE + 1e-9:
+                virtual_h = int(1080 * scale)
+                return virtual_w, virtual_h, scale
+    except Exception:
+        pass
+
+    # Safe fallback: 960x540 (2x scale to 1080p HDMI).
+    return 960, 540, 0.5
+
+
+VIRTUAL_W, VIRTUAL_H, SCALE = _detect_dimensions()
 
 
 def s(px: float) -> int:
@@ -61,15 +113,8 @@ class RichScreen:
         self._init_pygame()
 
     def _init_pygame(self) -> None:
-        if self.fullscreen:
-            if not os.environ.get("DISPLAY") and not os.environ.get("WAYLAND_DISPLAY"):
-                os.environ.setdefault("SDL_VIDEODRIVER", "kmsdrm")
-
-        # Force nearest-neighbour scaling on the SDL2 renderer so
-        # pixel-art text (VT323) stays crisp even at non-integer scale
-        # factors like 800/960 = 0.833.  "0" = nearest, "1" = linear.
-        os.environ.setdefault("SDL_HINT_RENDER_SCALE_QUALITY", "0")
-
+        # SDL_VIDEODRIVER + SDL_HINT_RENDER_SCALE_QUALITY were set at module
+        # load, before pygame's video subsystem was initialised.
         import pygame
 
         pygame.init()
