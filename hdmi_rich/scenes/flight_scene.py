@@ -28,7 +28,7 @@ from hdmi_rich.chrome import SceneChrome
 from hdmi_rich.geo import bearing_and_distance, eta_closest_approach_seconds
 from hdmi_rich.scenes.scene_base import RichScene
 from hdmi_rich.screen import VIRTUAL_H, VIRTUAL_W, s
-from hdmi_rich.widgets import block, field, header, radar, ticker
+from hdmi_rich.widgets import block, field, header, lock_icon, radar, ticker
 
 CONTENT_TOP = header.HEIGHT + s(24)
 CONTENT_BOT = VIRTUAL_H - ticker.HEIGHT - s(24)
@@ -59,9 +59,6 @@ CYCLE_SECONDS = 5.0
 # refresh.  Prevents flapping to STANDBY every time a single aircraft
 # briefly leaves the zone between fetches.
 HAS_DATA_GRACE_S = 60.0
-# When the user taps a radar blip or contact row, that flight is
-# featured for this many seconds and the auto-cycle is paused.
-OVERRIDE_HOLD_S = 30.0
 # Hit-test tolerance for a radar blip (virtual pixels).
 BLIP_HIT_R = s(24)
 
@@ -124,7 +121,15 @@ class RichFlightScene(RichScene):
         primary = flights[primary_index] if flights else None
 
         callsign = primary.callsign if primary else None
-        header.draw(screen.surface, self.fonts, "ACTIVE CONTACT", callsign)
+        is_locked = (
+            primary is not None
+            and self._override_flight_id is not None
+            and primary.flight_id == self._override_flight_id
+        )
+        header.draw(
+            screen.surface, self.fonts, "ACTIVE CONTACT", callsign,
+            is_locked=is_locked,
+        )
 
         if primary:
             self._draw_route(screen.surface, primary)
@@ -298,8 +303,9 @@ class RichFlightScene(RichScene):
 
     def _pick_primary_index(self, flights, _t: float) -> int:
         """Advance the featured-flight cycle when multiple contacts are in
-        range.  A tap-driven override wins for OVERRIDE_HOLD_S seconds so
-        the operator can pin a specific contact.
+        range.  A tap-driven pin sticks until the operator taps elsewhere
+        or the pinned flight leaves the zone - no time-based expiry, so
+        a mid-cycle overhead refresh doesn't un-pin the aircraft.
 
         Uses ``time.monotonic()`` directly rather than the animation clock
         so the cycle timing is unaffected by scene transitions.
@@ -310,19 +316,15 @@ class RichFlightScene(RichScene):
             self._cycle_index = 0
             return 0
 
-        # Manual override wins while the hold window is active AND the
-        # pinned flight is still in the list.
-        if (
-            self._override_flight_id is not None
-            and now - self._override_at < OVERRIDE_HOLD_S
-        ):
+        # Manual pin wins while the pinned flight is still in the list.
+        if self._override_flight_id is not None:
             for i, f in enumerate(flights):
                 if f.flight_id == self._override_flight_id:
                     self._cycle_index = i
                     self._cycle_last = now
                     self._last_flight_id = f.flight_id
                     return i
-            # Pinned flight left the zone - drop the override.
+            # Pinned flight left the zone - drop the pin.
             self._override_flight_id = None
 
         if n == 1:
@@ -562,8 +564,23 @@ class RichFlightScene(RichScene):
             is_current = idx == current_index
             colour = theme.PRIMARY if is_current else theme.ACCENT
             if is_current:
-                chev = self.fonts.small.render(">", True, theme.PRIMARY)
-                surface.blit(chev, (col_x["chev"], y - s(2)))
+                # Padlock icon when the featured flight is tap-pinned;
+                # chevron ">" when we're in the auto-cycling rotation.
+                pin_active = (
+                    self._override_flight_id is not None
+                    and f.flight_id == self._override_flight_id
+                )
+                if pin_active:
+                    lock_icon.draw(
+                        surface,
+                        col_x["chev"] + s(10),
+                        y + s(18),
+                        s(32),
+                        theme.ACCENT,
+                    )
+                else:
+                    chev = self.fonts.small.render(">", True, theme.PRIMARY)
+                    surface.blit(chev, (col_x["chev"], y - s(2)))
             call = self.fonts.small.render(
                 (f.callsign or "?").upper(), True, colour
             )

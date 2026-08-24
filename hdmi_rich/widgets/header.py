@@ -16,7 +16,13 @@ HEIGHT = s(96)
 _PAD_X = s(24)
 
 
-def draw(surface, fonts, title: str, callsign: str | None = None) -> None:
+def draw(
+    surface,
+    fonts,
+    title: str,
+    callsign: str | None = None,
+    is_locked: bool = False,
+) -> None:
     """Draw the top banner.
 
     * When *callsign* is None (idle / STANDBY) the *title* text is
@@ -24,6 +30,9 @@ def draw(surface, fonts, title: str, callsign: str | None = None) -> None:
     * When *callsign* is set (active scene) the title is suppressed
       entirely; the outline is phosphor green and the callsign is
       rendered centred and flashing at 1 Hz (on 700 ms, off 300 ms).
+    * When *is_locked* is True the left-side label reads "LOCKED" in
+      amber (instead of "ACTIVE" in green) so a glance at the top bar
+      distinguishes tap-pinned vs auto-cycling.
     """
     import time
 
@@ -34,9 +43,16 @@ def draw(surface, fonts, title: str, callsign: str | None = None) -> None:
     pygame.draw.rect(surface, chrome_colour, pygame.Rect(0, 0, w, HEIGHT), 2)
 
     if is_active:
-        # Left-justified "ACTIVE" label (green, solid) - matches the
-        # green chrome + inverse-video callsign block that follows.
-        label_surf = fonts.medium.render("ACTIVE", True, theme.PRIMARY)
+        # Left-justified state label.  Green ACTIVE for auto-cycle mode,
+        # amber LOCKED when the operator has tapped a specific contact
+        # to pin it.
+        if is_locked:
+            label_text = "LOCKED"
+            label_colour = theme.ACCENT
+        else:
+            label_text = "ACTIVE"
+            label_colour = theme.PRIMARY
+        label_surf = fonts.medium.render(label_text, True, label_colour)
         surface.blit(
             label_surf, (_PAD_X, HEIGHT // 2 - label_surf.get_height() // 2)
         )
