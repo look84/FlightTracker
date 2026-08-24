@@ -59,6 +59,13 @@ CYCLE_SECONDS = 5.0
 # refresh.  Prevents flapping to STANDBY every time a single aircraft
 # briefly leaves the zone between fetches.
 HAS_DATA_GRACE_S = 60.0
+# If the flight list's contents haven't changed in this many seconds the
+# overhead source is almost certainly dead (thread hung, upstream API
+# down, network unreachable) and we should fall back to STANDBY rather
+# than keep showing ancient telemetry.  Aircraft in real life update
+# altitude / speed / position on every fetch, so a completely
+# unchanged snapshot for minutes is a strong "stuck" signal.
+STALE_DATA_S = 180.0
 # Hit-test tolerance for a radar blip (virtual pixels).
 BLIP_HIT_R = s(24)
 
@@ -79,23 +86,62 @@ class RichFlightScene(RichScene):
         # the grace window (see HAS_DATA_GRACE_S) we render this so the
         # scene doesn't blank out mid-refresh.
         self._last_flights: list = []
-        # Tap-driven override: pins the featured flight for OVERRIDE_HOLD_S
-        # seconds so the auto-cycle stops walking off the aircraft the
-        # operator just tapped.
+        # Fingerprint of the last data snapshot + timestamp when it last
+        # changed, used to detect a stuck overhead source (see
+        # STALE_DATA_S).
+        self._last_data_fp: tuple | None = None
+        self._last_data_change_at: float | None = None
+        # Tap-driven pin: featured flight sticks until the operator taps
+        # elsewhere or the aircraft leaves the zone.
         self._override_flight_id: str | None = None
         self._override_at: float = 0.0
 
     def has_data(self) -> bool:
         """True while there are flights overhead, plus a grace window after
         the last non-empty refresh so we don't flap to STANDBY the moment
-        a single aircraft briefly leaves the zone between fetches."""
+        a single aircraft briefly leaves the zone between fetches.
+
+        Also returns False when the data hasn't changed for STALE_DATA_S -
+        that indicates the overhead source is stuck (thread hung, upstream
+        down) and we should hand off to STANDBY rather than keep showing
+        ancient telemetry.
+        """
         raw = getattr(self.overhead, "data", None) or []
+        now = time.monotonic()
+
+        # Fingerprint the current snapshot and record whether it changed.
+        # We include altitude/speed/heading/vs/lat/lng because real
+        # aircraft update at least one of these on every refresh, so an
+        # unchanged fingerprint across many refreshes is a stuck source.
+        fp = tuple(
+            (
+                f.flight_id,
+                int(f.altitude or 0),
+                int(f.ground_speed or 0),
+                int(f.heading or 0),
+                int(f.vertical_speed or 0),
+                round(f.lat, 4) if f.lat is not None else None,
+                round(f.lng, 4) if f.lng is not None else None,
+            )
+            for f in raw
+        )
+        if fp != self._last_data_fp:
+            self._last_data_fp = fp
+            self._last_data_change_at = now
+
         if raw:
-            self._last_had_data_at = time.monotonic()
+            # Reject data that hasn't changed for too long - the source
+            # is presumed hung and we'd rather fall back to STANDBY.
+            if (
+                self._last_data_change_at is not None
+                and now - self._last_data_change_at > STALE_DATA_S
+            ):
+                return False
+            self._last_had_data_at = now
             return True
         if self._last_had_data_at is None:
             return False
-        return time.monotonic() - self._last_had_data_at < HAS_DATA_GRACE_S
+        return now - self._last_had_data_at < HAS_DATA_GRACE_S
 
     def on_enter(self) -> None:
         self._cycle_index = 0

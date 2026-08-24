@@ -200,9 +200,21 @@ class RichDisplay:
         return mgr
 
     def _refresh_loop(self, overhead, interval: int, stop_flag: threading.Event) -> None:
+        # Heartbeat log so a stuck overhead.refresh() (e.g. FR24's HTTP
+        # call hanging without a hard timeout) is visible in /logs.
+        started_at = time.monotonic()
+        tick = 0
         while not stop_flag.is_set():
             try:
                 overhead.refresh()
+                tick += 1
+                if tick % 4 == 1:
+                    self.logger.debug(
+                        "overhead.refresh tick=%d age=%.0fs data_len=%d",
+                        tick,
+                        time.monotonic() - started_at,
+                        len(getattr(overhead, "data", None) or []),
+                    )
             except Exception:
                 self.logger.exception("overhead.refresh() failed")
             if stop_flag.wait(interval):
