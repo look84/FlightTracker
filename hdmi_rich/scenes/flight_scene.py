@@ -28,7 +28,7 @@ from hdmi_rich.chrome import SceneChrome
 from hdmi_rich.geo import bearing_and_distance, eta_closest_approach_seconds
 from hdmi_rich.scenes.scene_base import RichScene
 from hdmi_rich.screen import VIRTUAL_H, VIRTUAL_W, s
-from hdmi_rich.widgets import block, field, header, radar, ticker
+from hdmi_rich.widgets import block, field, header, lock_icon, radar, ticker
 
 CONTENT_TOP = header.HEIGHT + s(24)
 CONTENT_BOT = VIRTUAL_H - ticker.HEIGHT - s(24)
@@ -617,6 +617,17 @@ class RichFlightScene(RichScene):
             surface.blit(alt, (col_x["alt"], y))
             surface.blit(spd, (col_x["spd"], y))
             surface.blit(dist, (col_x["dist"], y))
+
+            # Padlock icon at the row's right edge inside col_rect - only
+            # drawn on the pinned row so non-pinned rows keep DIST at its
+            # 84% anchor with no reserved tail.  Rendered after DIST so
+            # it sits on top; the pinned flight's DIST value is still
+            # visible in the main flight card if it gets covered here.
+            if pin_active:
+                icon_size = int(text_h * 0.75)
+                icx = col_rect.right - s(6) - icon_size // 2
+                icy = y + text_h // 2
+                lock_icon.draw(surface, icx, icy, icon_size, theme.PRIMARY)
 
     # -- geo helpers ----------------------------------------------------
 
